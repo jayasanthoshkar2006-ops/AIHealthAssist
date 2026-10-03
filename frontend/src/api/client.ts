@@ -1,5 +1,4 @@
-const API_BASE_URL = '/api/v1';
-
+const API_BASE_URL = 'https://aihealthassist-backend.onrender.com/api/v1';
 export async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
