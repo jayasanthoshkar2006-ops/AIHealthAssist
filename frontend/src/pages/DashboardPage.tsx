@@ -16,6 +16,18 @@ import {
   Activity,
 } from 'lucide-react';
 
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+} from 'recharts';
+
 export const DashboardPage: React.FC = () => {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -55,6 +67,46 @@ export const DashboardPage: React.FC = () => {
 
   const schedule = data?.schedule;
   const profile = data?.profile;
+
+  /*
+   * GRAPH DATA
+   *
+   * The backend can provide:
+   *
+   * data.workout_trend
+   * data.sleep_trend
+   *
+   * If the backend has not provided historical data yet,
+   * we create only empty days.
+   *
+   * No fake numbers are inserted.
+   */
+
+  const workoutTrendData =
+    Array.isArray(data?.workout_trend) && data.workout_trend.length > 0
+      ? data.workout_trend
+      : [
+          { day: 'Mon', reps: null, form: null },
+          { day: 'Tue', reps: null, form: null },
+          { day: 'Wed', reps: null, form: null },
+          { day: 'Thu', reps: null, form: null },
+          { day: 'Fri', reps: null, form: null },
+          { day: 'Sat', reps: null, form: null },
+          { day: 'Sun', reps: null, form: null },
+        ];
+
+  const sleepTrendData =
+    Array.isArray(data?.sleep_trend) && data.sleep_trend.length > 0
+      ? data.sleep_trend
+      : [
+          { day: 'Mon', hours: null },
+          { day: 'Tue', hours: null },
+          { day: 'Wed', hours: null },
+          { day: 'Thu', hours: null },
+          { day: 'Fri', hours: null },
+          { day: 'Sat', hours: null },
+          { day: 'Sun', hours: null },
+        ];
 
   return (
     <div className="space-y-6">
@@ -163,7 +215,6 @@ export const DashboardPage: React.FC = () => {
 
         </div>
 
-
         {!performance.has_data ? (
 
           <div className="border border-dashed border-slate-700 rounded-2xl p-6 text-center">
@@ -221,8 +272,6 @@ export const DashboardPage: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
 
-        {/* Workout */}
-
         <MetricCard
           icon={<Dumbbell className="w-5 h-5" />}
           title="Workouts"
@@ -245,8 +294,6 @@ export const DashboardPage: React.FC = () => {
           }
         />
 
-        {/* Nutrition */}
-
         <MetricCard
           icon={<Utensils className="w-5 h-5" />}
           title="Nutrition Today"
@@ -263,8 +310,6 @@ export const DashboardPage: React.FC = () => {
           }
         />
 
-        {/* Sleep */}
-
         <MetricCard
           icon={<Moon className="w-5 h-5" />}
           title="Sleep Routine"
@@ -280,8 +325,6 @@ export const DashboardPage: React.FC = () => {
               : 'Record sleep to start tracking'
           }
         />
-
-        {/* Streak */}
 
         <MetricCard
           icon={<Zap className="w-5 h-5" />}
@@ -379,7 +422,6 @@ export const DashboardPage: React.FC = () => {
 
           </div>
 
-
           {!schedule ? (
 
             <div className="border border-dashed border-slate-700 rounded-2xl p-6 text-center">
@@ -466,74 +508,184 @@ export const DashboardPage: React.FC = () => {
 
 
       {/* ===================================================== */}
-      {/* REAL DATA GRAPHS */}
+      {/* PREVIOUS WORKOUT + SLEEP GRAPHS */}
       {/* ===================================================== */}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        {/* Workout */}
+        {/* ================================================= */}
+        {/* WORKOUT GRAPH */}
+        {/* ================================================= */}
 
-        <DataPanel
-          title="Workout Progress"
-          hasData={hasWorkoutData}
-          icon={<Dumbbell className="w-5 h-5" />}
-        >
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="flex items-center justify-between mb-5">
 
-            <SmallStat
-              label="Sessions"
-              value={metrics.workouts_completed}
-            />
+            <div className="flex items-center gap-2">
 
-            <SmallStat
-              label="Minutes"
-              value={metrics.total_workout_minutes}
-            />
+              <Dumbbell className="w-5 h-5 text-sky-400" />
 
-            <SmallStat
-              label="Reps"
-              value={metrics.total_reps}
-            />
+              <div>
 
-          </div>
+                <h3 className="text-lg font-bold text-slate-100">
+                  Workout Progress
+                </h3>
 
-          {metrics.calories_burned > 0 && (
-            <p className="text-xs text-slate-400 mt-4">
-              Calories burned: {Math.round(metrics.calories_burned)} kcal
-            </p>
-          )}
+                <p className="text-xs text-slate-400 mt-1">
+                  Reps and form accuracy
+                </p>
 
-        </DataPanel>
-
-
-        {/* Sleep */}
-
-        <DataPanel
-          title="Sleep Tracking"
-          hasData={hasSleepData}
-          icon={<Moon className="w-5 h-5" />}
-        >
-
-          {hasSleepData ? (
-
-            <div className="grid grid-cols-2 gap-4">
-
-              <SmallStat
-                label="Duration"
-                value={`${metrics.sleep_duration_hours} hrs`}
-              />
-
-              <SmallStat
-                label="Quality"
-                value={`${metrics.sleep_quality_score}/10`}
-              />
+              </div>
 
             </div>
 
-          ) : null}
+          </div>
 
-        </DataPanel>
+          <div className="h-64 w-full">
+
+            <ResponsiveContainer width="100%" height="100%">
+
+              <AreaChart data={workoutTrendData}>
+
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="#334155"
+                />
+
+                <XAxis
+                  dataKey="day"
+                  stroke="#64748b"
+                  tick={{
+                    fill: '#94a3b8',
+                    fontSize: 12,
+                  }}
+                />
+
+                <YAxis
+                  stroke="#64748b"
+                  tick={{
+                    fill: '#94a3b8',
+                    fontSize: 12,
+                  }}
+                />
+
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#0f172a',
+                    border: '1px solid #334155',
+                    borderRadius: '12px',
+                    color: '#e2e8f0',
+                  }}
+                />
+
+                <Area
+                  type="monotone"
+                  dataKey="reps"
+                  name="Reps"
+                  stroke="#38bdf8"
+                  fill="#38bdf8"
+                  fillOpacity={0.12}
+                  connectNulls={false}
+                />
+
+                <Area
+                  type="monotone"
+                  dataKey="form"
+                  name="Form %"
+                  stroke="#34d399"
+                  fill="#34d399"
+                  fillOpacity={0.08}
+                  connectNulls={false}
+                />
+
+              </AreaChart>
+
+            </ResponsiveContainer>
+
+          </div>
+
+        </div>
+
+
+        {/* ================================================= */}
+        {/* SLEEP GRAPH */}
+        {/* ================================================= */}
+
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
+
+          <div className="flex items-center justify-between mb-5">
+
+            <div className="flex items-center gap-2">
+
+              <Moon className="w-5 h-5 text-sky-400" />
+
+              <div>
+
+                <h3 className="text-lg font-bold text-slate-100">
+                  Sleep Trend
+                </h3>
+
+                <p className="text-xs text-slate-400 mt-1">
+                  Sleep duration over the last 7 days
+                </p>
+
+              </div>
+
+            </div>
+
+          </div>
+
+          <div className="h-64 w-full">
+
+            <ResponsiveContainer width="100%" height="100%">
+
+              <BarChart data={sleepTrendData}>
+
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="#334155"
+                />
+
+                <XAxis
+                  dataKey="day"
+                  stroke="#64748b"
+                  tick={{
+                    fill: '#94a3b8',
+                    fontSize: 12,
+                  }}
+                />
+
+                <YAxis
+                  stroke="#64748b"
+                  tick={{
+                    fill: '#94a3b8',
+                    fontSize: 12,
+                  }}
+                />
+
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#0f172a',
+                    border: '1px solid #334155',
+                    borderRadius: '12px',
+                    color: '#e2e8f0',
+                  }}
+                />
+
+                <Bar
+                  dataKey="hours"
+                  name="Sleep Hours"
+                  fill="#38bdf8"
+                  radius={[6, 6, 0, 0]}
+                />
+
+              </BarChart>
+
+            </ResponsiveContainer>
+
+          </div>
+
+        </div>
 
       </div>
 
@@ -803,57 +955,6 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
       <span className="text-sm font-semibold text-slate-200">
         {value || 'Not set'}
       </span>
-
-    </div>
-  );
-};
-
-
-interface DataPanelProps {
-  title: string;
-  hasData: boolean;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}
-
-const DataPanel: React.FC<DataPanelProps> = ({
-  title,
-  hasData,
-  icon,
-  children,
-}) => {
-  return (
-    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
-
-      <div className="flex items-center gap-2 mb-5">
-
-        {icon}
-
-        <h3 className="text-lg font-bold text-slate-100">
-          {title}
-        </h3>
-
-      </div>
-
-      {!hasData ? (
-
-        <div className="border border-dashed border-slate-700 rounded-2xl p-8 text-center">
-
-          <p className="text-sm text-slate-400">
-            No data yet
-          </p>
-
-          <p className="text-xs text-slate-600 mt-1">
-            Real records will appear here automatically.
-          </p>
-
-        </div>
-
-      ) : (
-
-        children
-
-      )}
 
     </div>
   );
