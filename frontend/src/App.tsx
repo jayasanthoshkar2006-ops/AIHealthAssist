@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './store/AuthContext';
 import { Navbar } from './components/common/Navbar';
 import { Sidebar } from './components/common/Sidebar';
@@ -29,7 +29,7 @@ const ProtectedLayout: React.FC = () => {
     return <Navigate to="/login" replace />;
   }
 
-  if (!hasProfile && window.location.pathname !== '/onboarding') {
+  if (!hasProfile && window.location.hash !== '#/onboarding') {
     return <Navigate to="/onboarding" replace />;
   }
 
@@ -91,14 +91,14 @@ const ProtectedLayout: React.FC = () => {
 export const App: React.FC = () => {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <HashRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/onboarding" element={<OnboardingPage />} />
           <Route path="/*" element={<ProtectedLayout />} />
         </Routes>
-      </BrowserRouter>
+      </HashRouter>
     </AuthProvider>
   );
 };
