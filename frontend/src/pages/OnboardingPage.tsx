@@ -33,13 +33,13 @@ export const OnboardingPage: React.FC = () => {
     food_budget: 'Moderate',
     cooking_availability: 'Daily',
     eating_out_frequency: 'Rarely',
-    available_foods: [],
+    available_foods: [] as string[],
     gym_available: false,
     home_workout: true,
-    available_equipment: [],
+    available_equipment: [] as string[],
     fitness_level: 'Beginner',
     stress_rating: 5,
-    primary_goals: [],
+    primary_goals: [] as string[],
   });
 
   const updateField = (key: string, value: any) => {
