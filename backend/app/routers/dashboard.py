@@ -1,5 +1,4 @@
 from datetime import date, datetime, timedelta
-
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -16,21 +15,24 @@ from app.models.domain_models import (
     Streak,
     DailyPlan,
 )
-from app.routers.auth import get_current_user
+from app.auth.security import get_current_user
 
-
-router = APIRouter(
-    prefix="/dashboard",
-    tags=["Dashboard Overview"]
-)
+router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 
 @router.get("")
-def get_dashboard_overview(
+def get_dashboard(
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
 ):
     today = date.today()
+
+    start_of_today = datetime.combine(
+        today,
+        datetime.min.time()
+    )
+
+    start_of_next_day = start_of_today + timedelta(days=1)
 
     # ============================================================
     # USER PROFILE
@@ -42,34 +44,13 @@ def get_dashboard_overview(
         .first()
     )
 
-    user_name = profile.name if profile else "Friend"
-    profession = profile.profession if profile else None
-
     # ============================================================
-    # TODAY'S SCHEDULE
+    # USER SCHEDULE
     # ============================================================
 
     schedule = (
         db.query(UserSchedule)
-        .filter(
-            UserSchedule.user_id == current_user.id,
-            UserSchedule.schedule_date == today
-        )
-        .order_by(UserSchedule.id.desc())
-        .first()
-    )
-
-    # ============================================================
-    # TODAY'S DAILY PLAN
-    # ============================================================
-
-    plan = (
-        db.query(DailyPlan)
-        .filter(
-            DailyPlan.user_id == current_user.id,
-            DailyPlan.plan_date == today
-        )
-        .order_by(DailyPlan.id.desc())
+        .filter(UserSchedule.user_id == current_user.id)
         .first()
     )
 
@@ -77,90 +58,83 @@ def get_dashboard_overview(
     # TODAY'S WORKOUTS
     # ============================================================
 
-    start_of_day = datetime.combine(today, datetime.min.time())
-    start_of_next_day = start_of_day + timedelta(days=1)
-
-    workouts_today = (
+    today_workouts = (
         db.query(Workout)
         .filter(
             Workout.user_id == current_user.id,
-            Workout.created_at >= start_of_day,
-            Workout.created_at < start_of_next_day
+            Workout.created_at >= start_of_today,
+            Workout.created_at < start_of_next_day,
         )
         .all()
     )
 
-    workout_count = len(workouts_today)
-
-    total_workout_minutes = sum(
-        workout.duration_minutes or 0
-        for workout in workouts_today
-    )
+    workout_count = len(today_workouts)
 
     total_reps = sum(
         workout.total_reps or 0
-        for workout in workouts_today
+        for workout in today_workouts
+    )
+
+    workout_duration = sum(
+        workout.duration_minutes or 0
+        for workout in today_workouts
+    )
+
+    form_scores = [
+        workout.avg_form_score
+        for workout in today_workouts
+        if workout.avg_form_score is not None
+    ]
+
+    average_form = (
+        round(sum(form_scores) / len(form_scores), 1)
+        if form_scores
+        else 0
     )
 
     calories_burned = sum(
         workout.calories_burned or 0
-        for workout in workouts_today
-    )
-
-    # Only calculate form when an actual form score exists.
-    form_scores = [
-        workout.avg_form_score
-        for workout in workouts_today
-        if workout.avg_form_score is not None
-        and workout.avg_form_score > 0
-    ]
-
-    avg_form_score = (
-        round(sum(form_scores) / len(form_scores), 1)
-        if form_scores
-        else None
+        for workout in today_workouts
     )
 
     # ============================================================
     # TODAY'S NUTRITION
     # ============================================================
 
-    nutrition_today = (
+    nutrition_logs = (
         db.query(NutritionLog)
         .filter(
             NutritionLog.user_id == current_user.id,
-            NutritionLog.log_date == today
+            NutritionLog.log_date == today,
         )
         .all()
     )
 
-    nutrition_count = len(nutrition_today)
-
-    total_calories = sum(
-        nutrition.calories or 0
-        for nutrition in nutrition_today
+    calories_consumed = sum(
+        item.calories or 0
+        for item in nutrition_logs
     )
 
-    total_protein = sum(
-        nutrition.protein_g or 0
-        for nutrition in nutrition_today
+    protein_consumed = sum(
+        item.protein_g or 0
+        for item in nutrition_logs
     )
 
-    total_carbs = sum(
-        nutrition.carbs_g or 0
-        for nutrition in nutrition_today
+    carbs_consumed = sum(
+        item.carbs_g or 0
+        for item in nutrition_logs
     )
 
-    total_fat = sum(
-        nutrition.fat_g or 0
-        for nutrition in nutrition_today
+    fat_consumed = sum(
+        item.fat_g or 0
+        for item in nutrition_logs
     )
 
     # ============================================================
-    # SLEEP
+    # LATEST SLEEP
     # ============================================================
 
-    sleep_latest = (
+    latest_sleep = (
         db.query(SleepRecord)
         .filter(
             SleepRecord.user_id == current_user.id
@@ -172,58 +146,46 @@ def get_dashboard_overview(
         .first()
     )
 
-    sleep_duration = (
-        sleep_latest.duration_hours
-        if sleep_latest
-        else None
+    sleep_hours = (
+        latest_sleep.duration_hours
+        if latest_sleep and latest_sleep.duration_hours is not None
+        else 0
     )
 
     sleep_quality = (
-        sleep_latest.quality_score
-        if sleep_latest
-        else None
+        latest_sleep.quality_score
+        if latest_sleep and latest_sleep.quality_score is not None
+        else 0
     )
 
     # ============================================================
     # TODAY'S HABITS
     # ============================================================
 
-    habits_today = (
+    habits = (
         db.query(HabitRecord)
         .filter(
-            HabitRecord.user_id == current_user.id,
-            HabitRecord.completed_date == today
+            HabitRecord.user_id == current_user.id
         )
         .all()
     )
 
-    habits_total = len(habits_today)
-
-    habits_completed = sum(
+    completed_habits = sum(
         1
-        for habit in habits_today
-        if habit.is_completed
+        for habit in habits
+        if getattr(habit, "completed", False)
     )
 
-    # ============================================================
-    # REAL STREAK
-    # ============================================================
+    total_habits = len(habits)
 
-    streaks = (
-        db.query(Streak)
-        .filter(
-            Streak.user_id == current_user.id
+    habit_completion = (
+        round(
+            (completed_habits / total_habits) * 100,
+            1
         )
-        .all()
+        if total_habits > 0
+        else 0
     )
-
-    streak_days = 0
-
-    if streaks:
-        streak_days = max(
-            (streak.current_streak or 0)
-            for streak in streaks
-        )
 
     # ============================================================
     # GOALS
@@ -237,213 +199,218 @@ def get_dashboard_overview(
         .all()
     )
 
-    goal_data = []
-
-    for goal in goals:
-        goal_data.append({
-            "id": goal.id,
-            "title": goal.title,
-            "category": goal.category,
-            "current_value": goal.current_value,
-            "target_value": goal.target_value,
-            "unit": goal.unit,
-            "deadline": (
-                str(goal.deadline)
-                if goal.deadline
-                else None
-            ),
-            "is_completed": goal.is_completed,
-        })
-
     # ============================================================
-    # DAILY PERFORMANCE
-    #
-    # The score only uses activities that can actually be measured.
-    #
-    # Workout  = 25%
-    # Nutrition = 25%
-    # Sleep     = 25%
-    # Habits    = 25%
-    #
-    # If there is no data at all, score is None.
+    # STREAK
     # ============================================================
 
-    performance_components = {}
-
-    # ----------------------------
-    # Workout performance
-    # ----------------------------
-
-    workout_score = None
-
-    if workout_count > 0:
-        workout_score = 100
-
-    performance_components["workout"] = workout_score
-
-    # ----------------------------
-    # Nutrition performance
-    # ----------------------------
-
-    nutrition_score = None
-
-    if nutrition_count > 0:
-        # Recording meals is measurable.
-        # We don't assume a specific calorie target
-        # without a proper personalized target.
-        nutrition_score = 100
-
-    performance_components["nutrition"] = nutrition_score
-
-    # ----------------------------
-    # Sleep performance
-    # ----------------------------
-
-    sleep_score = None
-
-    if sleep_latest:
-        # Use recorded sleep quality when available.
-        if sleep_quality is not None:
-            sleep_score = min(
-                100,
-                max(
-                    0,
-                    round((sleep_quality / 10) * 100)
-                )
-            )
-        else:
-            sleep_score = 100
-
-    performance_components["sleep"] = sleep_score
-
-    # ----------------------------
-    # Habit performance
-    # ----------------------------
-
-    habit_score = None
-
-    if habits_total > 0:
-        habit_score = round(
-            (habits_completed / habits_total) * 100
+    streak = (
+        db.query(Streak)
+        .filter(
+            Streak.user_id == current_user.id
         )
+        .first()
+    )
 
-    performance_components["habits"] = habit_score
-
-    # ============================================================
-    # FINAL DAILY PERFORMANCE
-    #
-    # Only components with real data are included.
-    # ============================================================
-
-    available_scores = [
-        score
-        for score in performance_components.values()
-        if score is not None
-    ]
-
-    daily_performance = (
-        round(sum(available_scores) / len(available_scores))
-        if available_scores
-        else None
+    current_streak = (
+        getattr(streak, "current_streak", 0)
+        if streak
+        else 0
     )
 
     # ============================================================
-    # PERFORMANCE STATUS
+    # TODAY'S PLAN
     # ============================================================
 
-    if daily_performance is None:
-        performance_status = "No data yet"
-    elif daily_performance >= 80:
-        performance_status = "Strong activity recorded"
-    elif daily_performance >= 60:
-        performance_status = "Good progress"
-    elif daily_performance >= 40:
-        performance_status = "Some activity recorded"
-    else:
-        performance_status = "Getting started"
-
-    # ============================================================
-    # AI INSIGHTS
-    #
-    # These are generated from REAL data only.
-    # ============================================================
-
-    ai_insights = []
-
-    if workout_count == 0:
-        ai_insights.append(
-            "No workout recorded today yet."
+    today_plan = (
+        db.query(DailyPlan)
+        .filter(
+            DailyPlan.user_id == current_user.id,
+            DailyPlan.plan_date == today,
         )
-    else:
-        ai_insights.append(
-            f"You completed {workout_count} workout"
-            f"{'s' if workout_count != 1 else ''} today."
-        )
-
-    if nutrition_count == 0:
-        ai_insights.append(
-            "No nutrition records have been added today."
-        )
-    else:
-        ai_insights.append(
-            f"You recorded {nutrition_count} meal"
-            f"{'s' if nutrition_count != 1 else ''} today."
-        )
-
-    if sleep_latest is None:
-        ai_insights.append(
-            "No sleep record has been added yet."
-        )
-    else:
-        ai_insights.append(
-            f"Latest recorded sleep duration: "
-            f"{sleep_duration:.1f} hours."
-        )
-
-    if habits_total > 0:
-        ai_insights.append(
-            f"You completed {habits_completed} of "
-            f"{habits_total} recorded habits today."
-        )
-
-    # ============================================================
-    # TODAY'S PLAN INFORMATION
-    # ============================================================
-
-    today_plan = None
-
-    if plan:
-        today_plan = {
-            "plan_date": str(plan.plan_date),
-            "timeline": plan.timeline_json,
-            "recommendations": plan.recommendations_json,
-            "ai_insights": plan.ai_insights,
-        }
-
-    # ============================================================
-    # REAL WEIGHT INFORMATION
-    # ============================================================
-
-    current_weight = (
-        profile.weight
-        if profile and profile.weight is not None
-        else None
+        .first()
     )
 
-    height = (
-        profile.height
-        if profile and profile.height is not None
-        else None
-    )
+    # ============================================================
+    # BMI
+    # ============================================================
 
     bmi = None
 
-    if current_weight is not None and height and height > 0:
-        height_m = height / 100
+    if profile:
+        height = profile.height
+        weight = profile.weight
 
-        bmi = round(
-            current_weight / (height_m * height_m),
-            1
+        if height and weight and height > 0:
+            height_m = height / 100
+            bmi = round(
+                weight / (height_m * height_m),
+                1
+            )
+
+    # ============================================================
+    # 7-DAY REAL WORKOUT TREND
+    # ============================================================
+    #
+    # Only actual Workout records from the database are used.
+    # Missing days return None instead of fake values.
+    # ============================================================
+
+    trend_start = today - timedelta(days=6)
+
+    workouts_7_days = (
+        db.query(Workout)
+        .filter(
+            Workout.user_id == current_user.id,
+            Workout.created_at >= datetime.combine(
+                trend_start,
+                datetime.min.time()
+            ),
+            Workout.created_at < start_of_next_day,
+        )
+        .all()
+    )
+
+    workout_trend = []
+
+    for day_offset in range(7):
+
+        trend_day = trend_start + timedelta(
+            days=day_offset
+        )
+
+        day_workouts = [
+            workout
+            for workout in workouts_7_days
+            if workout.created_at is not None
+            and workout.created_at.date() == trend_day
+        ]
+
+        day_reps = sum(
+            workout.total_reps or 0
+            for workout in day_workouts
+        )
+
+        day_form_scores = [
+            workout.avg_form_score
+            for workout in day_workouts
+            if workout.avg_form_score is not None
+            and workout.avg_form_score > 0
+        ]
+
+        day_form = (
+            round(
+                sum(day_form_scores) /
+                len(day_form_scores),
+                1
+            )
+            if day_form_scores
+            else None
+        )
+
+        workout_trend.append({
+            "day": trend_day.strftime("%a"),
+            "date": str(trend_day),
+
+            # No workout = no fake value
+            "reps": (
+                day_reps
+                if day_workouts
+                else None
+            ),
+
+            "form": day_form,
+        })
+
+    # ============================================================
+    # 7-DAY REAL SLEEP TREND
+    # ============================================================
+    #
+    # Only actual SleepRecord entries are used.
+    # Missing days return None.
+    # ============================================================
+
+    sleep_records_7_days = (
+        db.query(SleepRecord)
+        .filter(
+            SleepRecord.user_id == current_user.id,
+            SleepRecord.sleep_date >= trend_start,
+            SleepRecord.sleep_date <= today,
+        )
+        .order_by(
+            SleepRecord.sleep_date.asc(),
+            SleepRecord.id.asc()
+        )
+        .all()
+    )
+
+    sleep_by_day = {}
+
+    for record in sleep_records_7_days:
+
+        if record.sleep_date is not None:
+            sleep_by_day[record.sleep_date] = record
+
+    sleep_trend = []
+
+    for day_offset in range(7):
+
+        trend_day = trend_start + timedelta(
+            days=day_offset
+        )
+
+        record = sleep_by_day.get(trend_day)
+
+        sleep_trend.append({
+            "day": trend_day.strftime("%a"),
+            "date": str(trend_day),
+
+            # No sleep record = no fake value
+            "hours": (
+                record.duration_hours
+                if record
+                and record.duration_hours is not None
+                else None
+            ),
+        })
+
+    # ============================================================
+    # AI INSIGHTS
+    # ============================================================
+
+    insights = []
+
+    if average_form > 0:
+        if average_form >= 90:
+            insights.append(
+                "Your workout form is looking strong."
+            )
+        elif average_form >= 75:
+            insights.append(
+                "Your workout form is improving. "
+                "Focus on controlled movements."
+            )
+        else:
+            insights.append(
+                "Focus on maintaining proper form "
+                "during your exercises."
+            )
+
+    if sleep_hours > 0:
+        if sleep_hours >= 7:
+            insights.append(
+                "Your recorded sleep duration is "
+                "within a commonly recommended range."
+            )
+        else:
+            insights.append(
+                "Your recorded sleep duration is "
+                "below 7 hours."
+            )
+
+    if not insights:
+        insights.append(
+            "Start recording workouts and sleep "
+            "to receive personalized insights."
         )
 
     # ============================================================
@@ -451,15 +418,26 @@ def get_dashboard_overview(
     # ============================================================
 
     return {
-        "user_name": user_name,
-        "profession": profession,
-        "today_date": str(today),
-
-        "profile": {
-            "height_cm": height,
-            "weight_kg": current_weight,
-            "bmi": bmi,
-        },
+        "profile": (
+            {
+                "name": profile.name,
+                "age": profile.age,
+                "gender": profile.gender,
+                "height": profile.height,
+                "weight": profile.weight,
+                "profession": profile.profession,
+                "fitness_level": profile.fitness_level,
+                "food_preference": profile.food_preference,
+                "food_budget": profile.food_budget,
+                "cooking_availability": profile.cooking_availability,
+                "gym_available": profile.gym_available,
+                "home_workout": profile.home_workout,
+                "stress_rating": profile.stress_rating,
+                "preferred_language": profile.preferred_language,
+            }
+            if profile
+            else None
+        ),
 
         "schedule": (
             {
@@ -467,79 +445,90 @@ def get_dashboard_overview(
                 "sleep_time": schedule.sleep_time,
                 "work_start": schedule.work_start,
                 "work_end": schedule.work_end,
-                "schedule_data": schedule.schedule_data,
             }
             if schedule
             else None
         ),
 
-        "today_plan": today_plan,
+        "bmi": bmi,
 
-        "metrics": {
-            "workouts_completed": workout_count,
-            "total_workout_minutes": total_workout_minutes,
+        "today": {
+            "workout_count": workout_count,
             "total_reps": total_reps,
+            "workout_duration": workout_duration,
+            "average_form": average_form,
             "calories_burned": calories_burned,
-            "avg_form_score": avg_form_score,
-
-            "nutrition_entries": nutrition_count,
-            "today_calories": (
-                total_calories
-                if nutrition_count > 0
-                else None
-            ),
-            "today_protein_g": (
-                total_protein
-                if nutrition_count > 0
-                else None
-            ),
-            "today_carbs_g": (
-                total_carbs
-                if nutrition_count > 0
-                else None
-            ),
-            "today_fat_g": (
-                total_fat
-                if nutrition_count > 0
-                else None
-            ),
-
-            "sleep_duration_hours": sleep_duration,
-            "sleep_quality_score": sleep_quality,
-
-            "habits_total": habits_total,
-            "habits_completed": habits_completed,
-
-            "streak_days": streak_days,
+            "calories_consumed": calories_consumed,
+            "protein_consumed": protein_consumed,
+            "carbs_consumed": carbs_consumed,
+            "fat_consumed": fat_consumed,
+            "sleep_hours": sleep_hours,
+            "sleep_quality": sleep_quality,
+            "habit_completion": habit_completion,
         },
 
-        "daily_performance": {
-            "score": daily_performance,
-            "status": performance_status,
-            "components": {
-                "workout": workout_score,
-                "nutrition": nutrition_score,
-                "sleep": sleep_score,
-                "habits": habit_score,
-            },
-            "has_data": daily_performance is not None,
+        "habits": {
+            "completed": completed_habits,
+            "total": total_habits,
+            "completion_percentage": habit_completion,
         },
 
-        "goals": goal_data,
+        "goals": [
+            {
+                "id": goal.id,
+                "title": getattr(
+                    goal,
+                    "title",
+                    None
+                ),
+                "description": getattr(
+                    goal,
+                    "description",
+                    None
+                ),
+                "target_value": getattr(
+                    goal,
+                    "target_value",
+                    None
+                ),
+                "current_value": getattr(
+                    goal,
+                    "current_value",
+                    None
+                ),
+                "status": getattr(
+                    goal,
+                    "status",
+                    None
+                ),
+            }
+            for goal in goals
+        ],
 
-        "ai_insights": ai_insights,
-
-        "data_status": {
-            "has_workout_data": workout_count > 0,
-            "has_nutrition_data": nutrition_count > 0,
-            "has_sleep_data": sleep_latest is not None,
-            "has_habit_data": habits_total > 0,
-            "has_plan": plan is not None,
+        "streak": {
+            "current": current_streak,
         },
 
-        "disclaimer": (
-            "This dashboard organizes user-recorded wellness "
-            "information and calculated activity summaries. "
-            "It is not a clinical assessment or diagnosis."
+        "today_plan": (
+            {
+                "id": today_plan.id,
+                "plan_date": str(today_plan.plan_date),
+            }
+            if today_plan
+            else None
         ),
+
+        # ========================================================
+        # REAL GRAPH DATA
+        # ========================================================
+
+        "workout_trend": workout_trend,
+
+        "sleep_trend": sleep_trend,
+
+        # ========================================================
+        # AI INSIGHTS
+        # ========================================================
+
+        "ai_insights": insights,
     }
