@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../store/AuthContext';
 import { apiRequest } from '../api/client';
-import { Sparkles, ArrowRight } from 'lucide-react';
+import { Sparkles, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 export const RegisterPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [language, setLanguage] = useState('en');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,6 +25,7 @@ export const RegisterPage: React.FC = () => {
         method: 'POST',
         body: JSON.stringify({ email, password, language }),
       });
+
       login(res.access_token, res.email, false);
       navigate('/onboarding');
     } catch (err: any) {
@@ -36,13 +38,16 @@ export const RegisterPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center px-4 py-12">
       <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-6">
+
         <div className="text-center space-y-2">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-sky-500 to-emerald-400 mx-auto flex items-center justify-center shadow-glow">
             <Sparkles className="w-8 h-8 text-slate-950 stroke-[2.5]" />
           </div>
+
           <h2 className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-sky-400 to-emerald-400 bg-clip-text text-transparent">
             Create Account
           </h2>
+
           <p className="text-xs text-slate-400">
             Setup your personalized AI Health & Wellness account
           </p>
@@ -55,8 +60,12 @@ export const RegisterPage: React.FC = () => {
         )}
 
         <form onSubmit={handleRegister} className="space-y-4">
+
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Email Address</label>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">
+              Email Address
+            </label>
+
             <input
               type="email"
               value={email}
@@ -68,20 +77,41 @@ export const RegisterPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Minimum 6 characters"
-              required
-              minLength={6}
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-sky-500 focus:outline-none text-sm text-slate-100"
-            />
+            <label className="block text-xs font-semibold text-slate-300 mb-1">
+              Password
+            </label>
+
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Minimum 6 characters"
+                required
+                minLength={6}
+                className="w-full px-4 py-2.5 pr-12 rounded-xl bg-slate-950 border border-slate-800 focus:border-sky-500 focus:outline-none text-sm text-slate-100"
+              />
+
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-sky-400"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? (
+                  <EyeOff className="w-5 h-5" />
+                ) : (
+                  <Eye className="w-5 h-5" />
+                )}
+              </button>
+            </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Preferred Language</label>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">
+              Preferred Language
+            </label>
+
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
@@ -100,14 +130,19 @@ export const RegisterPage: React.FC = () => {
             {loading ? 'Creating Account...' : 'Continue to Onboarding'}
             <ArrowRight className="w-4 h-4" />
           </button>
+
         </form>
 
         <p className="text-center text-xs text-slate-500">
           Already registered?{' '}
-          <Link to="/login" className="text-sky-400 font-semibold hover:underline">
+          <Link
+            to="/login"
+            className="text-sky-400 font-semibold hover:underline"
+          >
             Sign in
           </Link>
         </p>
+
       </div>
     </div>
   );
