@@ -15,7 +15,7 @@ from app.models.domain_models import (
     Streak,
     DailyPlan,
 )
-from app.auth.security import get_current_user
+from app.routers.auth import get_current_user
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
