@@ -9,23 +9,12 @@ import {
   Moon,
   Zap,
   Sparkles,
-  ArrowUpRight,
-  TrendingUp,
   Video,
   FileText,
-  Calendar,
-  CheckCircle2
+  CheckCircle2,
+  TrendingUp,
+  Activity,
 } from 'lucide-react';
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip,
-  BarChart,
-  Bar
-} from 'recharts';
 
 export const DashboardPage: React.FC = () => {
   const [data, setData] = useState<any>(null);
@@ -34,30 +23,16 @@ export const DashboardPage: React.FC = () => {
 
   useEffect(() => {
     apiRequest('/dashboard')
-      .then((res) => setData(res))
-      .catch((err) => console.error(err))
-      .finally(() => setLoading(false));
+      .then((res) => {
+        setData(res);
+      })
+      .catch((err) => {
+        console.error('Dashboard error:', err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
-
-  const workoutTrendData = [
-    { day: 'Mon', reps: 40, form: 88 },
-    { day: 'Tue', reps: 45, form: 90 },
-    { day: 'Wed', reps: 50, form: 92 },
-    { day: 'Thu', reps: 35, form: 87 },
-    { day: 'Fri', reps: 60, form: 94 },
-    { day: 'Sat', reps: 55, form: 93 },
-    { day: 'Sun', reps: 65, form: 95 }
-  ];
-
-  const sleepTrendData = [
-    { day: 'Mon', hours: 7.2 },
-    { day: 'Tue', hours: 7.5 },
-    { day: 'Wed', hours: 6.8 },
-    { day: 'Thu', hours: 7.8 },
-    { day: 'Fri', hours: 7.4 },
-    { day: 'Sat', hours: 8.1 },
-    { day: 'Sun', hours: 7.6 }
-  ];
 
   if (loading) {
     return (
@@ -69,224 +44,841 @@ export const DashboardPage: React.FC = () => {
   }
 
   const metrics = data?.metrics || {};
+  const performance = data?.daily_performance || {};
+  const components = performance?.components || {};
+  const dataStatus = data?.data_status || {};
+
+  const hasWorkoutData = dataStatus.has_workout_data;
+  const hasNutritionData = dataStatus.has_nutrition_data;
+  const hasSleepData = dataStatus.has_sleep_data;
+  const hasHabitData = dataStatus.has_habit_data;
+
+  const schedule = data?.schedule;
+  const profile = data?.profile;
 
   return (
     <div className="space-y-6">
-      {/* Disclaimer Banner */}
+
       <DisclaimerBanner />
 
-      {/* Greeting Header */}
+      {/* ===================================================== */}
+      {/* HEADER */}
+      {/* ===================================================== */}
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-slate-900 to-sky-950/40 p-6 rounded-3xl border border-slate-800">
+
         <div>
-          <div className="flex items-center gap-2">
+
+          <div className="flex items-center gap-2 flex-wrap">
+
             <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
               AI Lifestyle Engine Active
             </span>
-            <span className="text-xs text-slate-400">• Profession: <strong className="text-slate-200">{data?.profession}</strong></span>
+
+            {data?.profession && (
+              <span className="text-xs text-slate-400">
+                • Profession:{' '}
+                <strong className="text-slate-200">
+                  {data.profession}
+                </strong>
+              </span>
+            )}
+
           </div>
+
           <h2 className="text-2xl font-extrabold tracking-tight text-slate-100 mt-2">
-            {t('goodMorning')}, <span className="bg-gradient-to-r from-sky-400 to-emerald-400 bg-clip-text text-transparent">{data?.user_name || 'Hari'}</span>
+
+            {t('goodMorning')},{' '}
+
+            <span className="bg-gradient-to-r from-sky-400 to-emerald-400 bg-clip-text text-transparent">
+              {data?.user_name || 'Friend'}
+            </span>
+
           </h2>
+
           <p className="text-xs text-slate-400 mt-1">
             {t('welcomeBack')}
           </p>
+
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+
           <Link
             to="/workout/live"
-            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-emerald-500 hover:from-sky-600 hover:to-emerald-600 text-slate-950 font-bold text-xs shadow-glow flex items-center gap-2 transition-all"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white text-sm font-semibold transition"
           >
             <Video className="w-4 h-4" />
-            {t('startWorkout')}
+            Start Live Workout
           </Link>
 
           <Link
             to="/reports"
-            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 flex items-center gap-2 transition-all"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold transition"
           >
-            <FileText className="w-4 h-4 text-sky-400" />
-            {t('downloadReport')}
+            <FileText className="w-4 h-4" />
+            Download PDF Report
           </Link>
+
         </div>
+
       </div>
 
-      {/* Top Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Workouts Card */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-semibold uppercase tracking-wider">Workouts</span>
-            <div className="p-2 rounded-xl bg-sky-500/10 text-sky-400">
-              <Dumbbell className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-extrabold text-slate-100">
-            {metrics.workouts_completed || 12} <span className="text-xs text-slate-400 font-normal">sessions</span>
-          </div>
-          <div className="text-[11px] text-emerald-400 flex items-center gap-1">
-            <TrendingUp className="w-3.5 h-3.5" />
-            <span>Avg Form: {metrics.avg_form_score || 91.5}%</span>
-          </div>
-        </div>
 
-        {/* Nutrition Card */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-semibold uppercase tracking-wider">Nutrition Today</span>
-            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
-              <Utensils className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-extrabold text-slate-100">
-            {metrics.today_calories || 1850} <span className="text-xs text-slate-400 font-normal">kcal</span>
-          </div>
-          <div className="text-[11px] text-slate-400">
-            Protein: <strong className="text-slate-200">{metrics.today_protein_g || 72}g</strong>
-          </div>
-        </div>
+      {/* ===================================================== */}
+      {/* DAILY PERFORMANCE */}
+      {/* ===================================================== */}
 
-        {/* Sleep Card */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-semibold uppercase tracking-wider">Sleep Routine</span>
-            <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400">
-              <Moon className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-extrabold text-slate-100">
-            {metrics.sleep_duration_hours || 7.5} <span className="text-xs text-slate-400 font-normal">hrs</span>
-          </div>
-          <div className="text-[11px] text-slate-400">
-            Quality: <strong className="text-emerald-400">{metrics.sleep_quality_score || 8}/10</strong>
-          </div>
-        </div>
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
 
-        {/* Streak Card */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-semibold uppercase tracking-wider">Consistency</span>
-            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
-              <Zap className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-extrabold text-slate-100">
-            {metrics.streak_days || 7} <span className="text-xs text-slate-400 font-normal">days streak</span>
-          </div>
-          <div className="text-[11px] text-amber-400 flex items-center gap-1 font-semibold">
-            <span>🔥 Active Milestone Streak</span>
-          </div>
-        </div>
-      </div>
+        <div className="flex items-center justify-between mb-5">
 
-      {/* Main Grid: AI Daily Schedule Card + Insights */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Today's AI Schedule Timeline (2 cols) */}
-        <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div>
+
             <div className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-sky-400" />
-              <h3 className="font-bold text-slate-100 text-sm">Today's Profession-Tailored Schedule</h3>
+
+              <Activity className="w-5 h-5 text-sky-400" />
+
+              <h3 className="text-lg font-bold text-slate-100">
+                Today's Performance
+              </h3>
+
             </div>
-            <Link to="/schedule" className="text-xs text-sky-400 hover:underline flex items-center gap-1">
-              {t('adjustSchedule')} <ArrowUpRight className="w-3.5 h-3.5" />
-            </Link>
+
+            <p className="text-xs text-slate-400 mt-1">
+              Calculated from your actual recorded activity
+            </p>
+
           </div>
 
-          <div className="space-y-3">
-            {[
-              { time: '06:30', activity: 'Wake Up, Hydration & Mobility Stretching', category: 'sleep' },
-              { time: '07:30', activity: 'Nutritious High Protein Breakfast', category: 'meal' },
-              { time: '09:00', activity: `Focused Work Session (${data?.profession})`, category: 'work' },
-              { time: '13:00', activity: 'Balanced Lunch & 10-min Walk', category: 'meal' },
-              { time: '18:30', activity: 'AI Live Pose Workout Session (35 mins)', category: 'workout', active: true },
-              { time: '20:00', activity: 'Dinner & Family Wind Down', category: 'meal' },
-              { time: '23:00', activity: 'Restful Sleep Target', category: 'sleep' }
-            ].map((item, idx) => (
-              <div
-                key={idx}
-                className={`flex items-center justify-between p-3 rounded-xl border text-xs transition-all ${
-                  item.active
-                    ? 'bg-sky-950/60 border-sky-500/50 text-sky-200'
-                    : 'bg-slate-950/50 border-slate-800 text-slate-300'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-sky-400 font-bold w-12">{item.time}</span>
-                  <span>{item.activity}</span>
-                </div>
-                {item.active && (
-                  <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[10px]">
-                    Upcoming
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
+          {performance.has_data ? (
+            <div className="text-3xl font-extrabold text-sky-400">
+              {performance.score}%
+            </div>
+          ) : (
+            <div className="text-sm font-semibold text-slate-400">
+              No data yet
+            </div>
+          )}
+
         </div>
 
-        {/* AI Insight Feed & Goal Progress */}
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
-          <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
-            <Sparkles className="w-5 h-5 text-emerald-400" />
-            <h3 className="font-bold text-slate-100 text-sm">AI Insights & Adaptive Focus</h3>
+
+        {!performance.has_data ? (
+
+          <div className="border border-dashed border-slate-700 rounded-2xl p-6 text-center">
+
+            <Sparkles className="w-8 h-8 mx-auto text-slate-500 mb-2" />
+
+            <p className="text-sm text-slate-300">
+              Start recording your daily activities.
+            </p>
+
+            <p className="text-xs text-slate-500 mt-1">
+              Your performance will be calculated automatically.
+            </p>
+
           </div>
 
-          <div className="space-y-3">
-            {(data?.ai_insights || [
-              `As a ${data?.profession}, your routine fits best with an 18:30 evening workout.`,
-              'Form accuracy has increased +4.5% across your last 3 sessions.',
-              'Optimal sleep duration maintained at 7.5 hours.'
-            ]).map((insight: string, idx: number) => (
-              <div key={idx} className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 leading-relaxed flex items-start gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                <span>{insight}</span>
-              </div>
-            ))}
+        ) : (
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+            <PerformanceItem
+              title="Workout"
+              value={components.workout}
+              icon={<Dumbbell className="w-4 h-4" />}
+            />
+
+            <PerformanceItem
+              title="Nutrition"
+              value={components.nutrition}
+              icon={<Utensils className="w-4 h-4" />}
+            />
+
+            <PerformanceItem
+              title="Sleep"
+              value={components.sleep}
+              icon={<Moon className="w-4 h-4" />}
+            />
+
+            <PerformanceItem
+              title="Habits"
+              value={components.habits}
+              icon={<CheckCircle2 className="w-4 h-4" />}
+            />
+
           </div>
-        </div>
+
+        )}
 
       </div>
 
-      {/* Analytics Charts */}
+
+      {/* ===================================================== */}
+      {/* METRICS */}
+      {/* ===================================================== */}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+
+        {/* Workout */}
+
+        <MetricCard
+          icon={<Dumbbell className="w-5 h-5" />}
+          title="Workouts"
+          value={
+            hasWorkoutData
+              ? `${metrics.workouts_completed}`
+              : 'No data'
+          }
+          suffix={
+            hasWorkoutData
+              ? `session${metrics.workouts_completed === 1 ? '' : 's'}`
+              : ''
+          }
+          footer={
+            hasWorkoutData
+              ? `Form: ${metrics.avg_form_score ?? 'Not measured'}${
+                  metrics.avg_form_score != null ? '%' : ''
+                }`
+              : 'Complete a workout to start tracking'
+          }
+        />
+
+        {/* Nutrition */}
+
+        <MetricCard
+          icon={<Utensils className="w-5 h-5" />}
+          title="Nutrition Today"
+          value={
+            hasNutritionData
+              ? `${Math.round(metrics.today_calories || 0)}`
+              : 'No data'
+          }
+          suffix={hasNutritionData ? 'kcal' : ''}
+          footer={
+            hasNutritionData
+              ? `Protein: ${Math.round(metrics.today_protein_g || 0)}g`
+              : 'Record a meal to start tracking'
+          }
+        />
+
+        {/* Sleep */}
+
+        <MetricCard
+          icon={<Moon className="w-5 h-5" />}
+          title="Sleep Routine"
+          value={
+            hasSleepData
+              ? `${metrics.sleep_duration_hours}`
+              : 'No data'
+          }
+          suffix={hasSleepData ? 'hrs' : ''}
+          footer={
+            hasSleepData
+              ? `Quality: ${metrics.sleep_quality_score ?? 'Not measured'}/10`
+              : 'Record sleep to start tracking'
+          }
+        />
+
+        {/* Streak */}
+
+        <MetricCard
+          icon={<Zap className="w-5 h-5" />}
+          title="Consistency"
+          value={`${metrics.streak_days || 0}`}
+          suffix="days"
+          footer={
+            metrics.streak_days > 0
+              ? 'Active milestone streak'
+              : 'Your streak starts with activity'
+          }
+        />
+
+      </div>
+
+
+      {/* ===================================================== */}
+      {/* PROFILE / BMI */}
+      {/* ===================================================== */}
+
+      {profile && (
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
+
+          <div className="flex items-center gap-2 mb-4">
+
+            <TrendingUp className="w-5 h-5 text-emerald-400" />
+
+            <h3 className="text-lg font-bold text-slate-100">
+              Your Current Profile
+            </h3>
+
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+
+            <ProfileValue
+              title="Height"
+              value={
+                profile.height_cm != null
+                  ? `${profile.height_cm} cm`
+                  : 'No data'
+              }
+            />
+
+            <ProfileValue
+              title="Weight"
+              value={
+                profile.weight_kg != null
+                  ? `${profile.weight_kg} kg`
+                  : 'No data'
+              }
+            />
+
+            <ProfileValue
+              title="BMI"
+              value={
+                profile.bmi != null
+                  ? `${profile.bmi}`
+                  : 'No data'
+              }
+            />
+
+          </div>
+
+          <p className="text-xs text-slate-500 mt-4">
+            BMI is shown as a calculated measurement from your entered height
+            and weight. It is not a medical diagnosis.
+          </p>
+
+        </div>
+      )}
+
+
+      {/* ===================================================== */}
+      {/* TODAY'S SCHEDULE */}
+      {/* ===================================================== */}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Workout Reps & Form Accuracy */}
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
-          <h3 className="font-bold text-slate-100 text-sm">Workout Volume & Form Accuracy (%)</h3>
-          <div className="h-60 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={workoutTrendData}>
-                <defs>
-                  <linearGradient id="colorReps" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#0284c7" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#0284c7" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="day" stroke="#64748b" fontSize={11} />
-                <YAxis stroke="#64748b" fontSize={11} />
-                <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b' }} />
-                <Area type="monotone" dataKey="reps" stroke="#0284c7" fillOpacity={1} fill="url(#colorReps)" />
-              </AreaChart>
-            </ResponsiveContainer>
+
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
+
+          <div className="flex items-center justify-between mb-5">
+
+            <div>
+
+              <h3 className="text-lg font-bold text-slate-100">
+                Today's Schedule
+              </h3>
+
+              <p className="text-xs text-slate-400 mt-1">
+                Based on your recorded schedule
+              </p>
+
+            </div>
+
           </div>
+
+
+          {!schedule ? (
+
+            <div className="border border-dashed border-slate-700 rounded-2xl p-6 text-center">
+
+              <p className="text-sm text-slate-400">
+                No schedule data yet.
+              </p>
+
+            </div>
+
+          ) : (
+
+            <div className="space-y-3">
+
+              <ScheduleItem
+                label="Wake"
+                value={schedule.wake_time}
+              />
+
+              <ScheduleItem
+                label="Work starts"
+                value={schedule.work_start}
+              />
+
+              <ScheduleItem
+                label="Work ends"
+                value={schedule.work_end}
+              />
+
+              <ScheduleItem
+                label="Sleep target"
+                value={schedule.sleep_time}
+              />
+
+            </div>
+
+          )}
+
         </div>
 
-        {/* Sleep Trend */}
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
-          <h3 className="font-bold text-slate-100 text-sm">Weekly Sleep Duration (Hours)</h3>
-          <div className="h-60 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={sleepTrendData}>
-                <XAxis dataKey="day" stroke="#64748b" fontSize={11} />
-                <YAxis stroke="#64748b" fontSize={11} />
-                <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b' }} />
-                <Bar dataKey="hours" fill="#10b981" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+
+        {/* ================================================= */}
+        {/* AI INSIGHTS */}
+        {/* ================================================= */}
+
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
+
+          <div className="flex items-center gap-2 mb-5">
+
+            <Sparkles className="w-5 h-5 text-sky-400" />
+
+            <h3 className="text-lg font-bold text-slate-100">
+              AI Insights & Adaptive Focus
+            </h3>
+
           </div>
+
+          <div className="space-y-3">
+
+            {(data?.ai_insights || []).map(
+              (insight: string, index: number) => (
+
+                <div
+                  key={index}
+                  className="flex gap-3 p-3 rounded-xl bg-slate-950 border border-slate-800"
+                >
+
+                  <Sparkles className="w-4 h-4 text-sky-400 mt-0.5 flex-shrink-0" />
+
+                  <p className="text-sm text-slate-300">
+                    {insight}
+                  </p>
+
+                </div>
+
+              )
+            )}
+
+          </div>
+
         </div>
+
       </div>
+
+
+      {/* ===================================================== */}
+      {/* REAL DATA GRAPHS */}
+      {/* ===================================================== */}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        {/* Workout */}
+
+        <DataPanel
+          title="Workout Progress"
+          hasData={hasWorkoutData}
+          icon={<Dumbbell className="w-5 h-5" />}
+        >
+
+          <div className="grid grid-cols-3 gap-3">
+
+            <SmallStat
+              label="Sessions"
+              value={metrics.workouts_completed}
+            />
+
+            <SmallStat
+              label="Minutes"
+              value={metrics.total_workout_minutes}
+            />
+
+            <SmallStat
+              label="Reps"
+              value={metrics.total_reps}
+            />
+
+          </div>
+
+          {metrics.calories_burned > 0 && (
+            <p className="text-xs text-slate-400 mt-4">
+              Calories burned: {Math.round(metrics.calories_burned)} kcal
+            </p>
+          )}
+
+        </DataPanel>
+
+
+        {/* Sleep */}
+
+        <DataPanel
+          title="Sleep Tracking"
+          hasData={hasSleepData}
+          icon={<Moon className="w-5 h-5" />}
+        >
+
+          {hasSleepData ? (
+
+            <div className="grid grid-cols-2 gap-4">
+
+              <SmallStat
+                label="Duration"
+                value={`${metrics.sleep_duration_hours} hrs`}
+              />
+
+              <SmallStat
+                label="Quality"
+                value={`${metrics.sleep_quality_score}/10`}
+              />
+
+            </div>
+
+          ) : null}
+
+        </DataPanel>
+
+      </div>
+
+
+      {/* ===================================================== */}
+      {/* HABITS */}
+      {/* ===================================================== */}
+
+      {hasHabitData && (
+
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
+
+          <div className="flex items-center gap-2 mb-4">
+
+            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+
+            <h3 className="text-lg font-bold text-slate-100">
+              Today's Habits
+            </h3>
+
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+            <SmallStat
+              label="Total"
+              value={metrics.habits_total}
+            />
+
+            <SmallStat
+              label="Completed"
+              value={metrics.habits_completed}
+            />
+
+            <SmallStat
+              label="Remaining"
+              value={
+                Math.max(
+                  0,
+                  (metrics.habits_total || 0) -
+                    (metrics.habits_completed || 0)
+                )
+              }
+            />
+
+            <SmallStat
+              label="Performance"
+              value={`${components.habits ?? 0}%`}
+            />
+
+          </div>
+
+        </div>
+
+      )}
+
+
+      {/* ===================================================== */}
+      {/* GOALS */}
+      {/* ===================================================== */}
+
+      {data?.goals?.length > 0 && (
+
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
+
+          <h3 className="text-lg font-bold text-slate-100 mb-4">
+            Your Goals
+          </h3>
+
+          <div className="space-y-3">
+
+            {data.goals.map((goal: any) => (
+
+              <div
+                key={goal.id}
+                className="flex items-center justify-between p-4 rounded-xl bg-slate-950 border border-slate-800"
+              >
+
+                <div>
+
+                  <p className="text-sm font-semibold text-slate-200">
+                    {goal.title}
+                  </p>
+
+                  <p className="text-xs text-slate-500 mt-1">
+                    {goal.category}
+                  </p>
+
+                </div>
+
+                <div className="text-right">
+
+                  {goal.target_value != null ? (
+
+                    <p className="text-sm text-sky-400 font-semibold">
+                      {goal.current_value ?? 0} / {goal.target_value}{' '}
+                      {goal.unit || ''}
+                    </p>
+
+                  ) : (
+
+                    <p className="text-xs text-slate-400">
+                      No target set
+                    </p>
+
+                  )}
+
+                </div>
+
+              </div>
+
+            ))}
+
+          </div>
+
+        </div>
+
+      )}
+
+
+      {/* ===================================================== */}
+      {/* DISCLAIMER */}
+      {/* ===================================================== */}
+
+      <div className="text-xs text-slate-500 text-center pb-6">
+        {data?.disclaimer}
+      </div>
+
+    </div>
+  );
+};
+
+
+/* =============================================================
+   COMPONENTS
+============================================================= */
+
+interface MetricCardProps {
+  icon: React.ReactNode;
+  title: string;
+  value: string;
+  suffix?: string;
+  footer: string;
+}
+
+const MetricCard: React.FC<MetricCardProps> = ({
+  icon,
+  title,
+  value,
+  suffix,
+  footer,
+}) => {
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+
+      <div className="flex items-center gap-2 text-slate-400 mb-3">
+
+        {icon}
+
+        <span className="text-xs font-semibold">
+          {title}
+        </span>
+
+      </div>
+
+      <div className="flex items-baseline gap-2">
+
+        <span className="text-2xl font-extrabold text-slate-100">
+          {value}
+        </span>
+
+        {suffix && (
+          <span className="text-xs text-slate-500">
+            {suffix}
+          </span>
+        )}
+
+      </div>
+
+      <p className="text-xs text-slate-500 mt-2">
+        {footer}
+      </p>
+
+    </div>
+  );
+};
+
+
+interface PerformanceItemProps {
+  title: string;
+  value: number | null | undefined;
+  icon: React.ReactNode;
+}
+
+const PerformanceItem: React.FC<PerformanceItemProps> = ({
+  title,
+  value,
+  icon,
+}) => {
+  return (
+    <div className="bg-slate-950 border border-slate-800 rounded-xl p-4">
+
+      <div className="flex items-center gap-2 text-slate-400 mb-2">
+
+        {icon}
+
+        <span className="text-xs">
+          {title}
+        </span>
+
+      </div>
+
+      <div className="text-lg font-bold text-slate-100">
+
+        {value != null
+          ? `${value}%`
+          : 'No data'}
+
+      </div>
+
+    </div>
+  );
+};
+
+
+interface ProfileValueProps {
+  title: string;
+  value: string;
+}
+
+const ProfileValue: React.FC<ProfileValueProps> = ({
+  title,
+  value,
+}) => {
+  return (
+    <div className="bg-slate-950 border border-slate-800 rounded-xl p-4">
+
+      <p className="text-xs text-slate-500">
+        {title}
+      </p>
+
+      <p className="text-lg font-bold text-slate-100 mt-1">
+        {value}
+      </p>
+
+    </div>
+  );
+};
+
+
+interface ScheduleItemProps {
+  label: string;
+  value?: string | null;
+}
+
+const ScheduleItem: React.FC<ScheduleItemProps> = ({
+  label,
+  value,
+}) => {
+  return (
+    <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800">
+
+      <span className="text-sm text-slate-400">
+        {label}
+      </span>
+
+      <span className="text-sm font-semibold text-slate-200">
+        {value || 'Not set'}
+      </span>
+
+    </div>
+  );
+};
+
+
+interface DataPanelProps {
+  title: string;
+  hasData: boolean;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}
+
+const DataPanel: React.FC<DataPanelProps> = ({
+  title,
+  hasData,
+  icon,
+  children,
+}) => {
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
+
+      <div className="flex items-center gap-2 mb-5">
+
+        {icon}
+
+        <h3 className="text-lg font-bold text-slate-100">
+          {title}
+        </h3>
+
+      </div>
+
+      {!hasData ? (
+
+        <div className="border border-dashed border-slate-700 rounded-2xl p-8 text-center">
+
+          <p className="text-sm text-slate-400">
+            No data yet
+          </p>
+
+          <p className="text-xs text-slate-600 mt-1">
+            Real records will appear here automatically.
+          </p>
+
+        </div>
+
+      ) : (
+
+        children
+
+      )}
+
+    </div>
+  );
+};
+
+
+interface SmallStatProps {
+  label: string;
+  value: string | number | null | undefined;
+}
+
+const SmallStat: React.FC<SmallStatProps> = ({
+  label,
+  value,
+}) => {
+  return (
+    <div className="bg-slate-950 border border-slate-800 rounded-xl p-4">
+
+      <p className="text-xs text-slate-500">
+        {label}
+      </p>
+
+      <p className="text-lg font-bold text-slate-100 mt-1">
+        {value ?? 'No data'}
+      </p>
 
     </div>
   );
