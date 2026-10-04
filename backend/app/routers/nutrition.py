@@ -1,6 +1,7 @@
 from datetime import date
 from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException
+from app.config import settings
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.domain_models import User, NutritionLog, UserProfile, EnvironmentResource, Goal
@@ -54,8 +55,21 @@ def analyze_food_image(data: FoodImageAnalyzeRequest):
         raise HTTPException(status_code=400, detail="A real food image is required.")
     if len(data.image_base64) > 12_000_000:
         raise HTTPException(status_code=413, detail="Image is too large. Please use an image smaller than 8 MB.")
+    if not settings.GEMINI_API_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="Food vision AI is not configured on the server. Add GEMINI_API_KEY to the Render backend environment, then redeploy."
+        )
+
     ai = get_ai_provider()
-    res = ai.analyze_food_image(data.image_base64, data.meal_type or "Lunch", data.mime_type or "image/jpeg")
+    try:
+        res = ai.analyze_food_image(data.image_base64, data.meal_type or "Lunch", data.mime_type or "image/jpeg")
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Food vision AI could not analyze this image. Please try a clearer photo or check the server vision configuration."
+        ) from exc
+
     return FoodAnalysisResponse(
         food_name=res["food_name"],
         estimated_serving=res["estimated_serving"],
