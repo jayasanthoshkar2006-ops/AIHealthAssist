@@ -154,6 +154,7 @@ export const LiveWorkoutPage: React.FC = () => {
   const repRef = useRef(0);
   const lastSpokenRef = useRef('');
   const lastFrameRef = useRef(-1);
+  const autoAdvanceRef = useRef(false);
 
   const [profile, setProfile] = useState<any>(null);
   const [selectedExercise, setSelectedExercise] = useState('Squat');
@@ -170,6 +171,7 @@ export const LiveWorkoutPage: React.FC = () => {
   const [sessionSeconds, setSessionSeconds] = useState(0);
 
   const exercise = EXERCISES.find(e => e.name === selectedExercise) || EXERCISES[0];
+  const planExercises = suggested.length ? suggested : [exercise];
 
   const speakFeedback = useCallback((text: string) => {
     if (!voiceEnabled || !('speechSynthesis' in window) || text === lastSpokenRef.current) return;
@@ -278,7 +280,32 @@ export const LiveWorkoutPage: React.FC = () => {
           stageRef.current = 'up';
           repRef.current = Math.min(targetReps, repRef.current + 1);
           setRepCount(repRef.current);
-          speakFeedback(repRef.current >= targetReps ? 'Target complete. ' + targetReps + ' repetitions finished.' : (form.feedback || 'Rep ' + repRef.current + ' complete'));
+          if (repRef.current >= targetReps && !autoAdvanceRef.current) {
+            autoAdvanceRef.current = true;
+            const currentIndex = planExercises.findIndex(e => e.name === selectedExercise);
+            const nextExercise = currentIndex >= 0 && currentIndex < planExercises.length - 1
+              ? planExercises[currentIndex + 1]
+              : null;
+            if (nextExercise) {
+              speakFeedback(selectedExercise + ' complete. Moving to ' + nextExercise.name + '.');
+              window.setTimeout(() => {
+                setSelectedExercise(nextExercise.name);
+                setTargetReps(targetFor(profile, nextExercise));
+                repRef.current = 0;
+                stageRef.current = 'up';
+                lastSpokenRef.current = ''; autoAdvanceRef.current = false;
+                setRepCount(0);
+                setFormScore(0);
+                setFeedback('Next exercise ready. Stand fully inside the frame.');
+                autoAdvanceRef.current = false;
+              }, 1200);
+            } else {
+              speakFeedback('All profession workout exercises are complete.');
+              setFeedback('Profession workout complete. End & Save to record the session.');
+            }
+          } else if (repRef.current < targetReps) {
+            speakFeedback(form.feedback || 'Rep ' + repRef.current + ' complete');
+          }
         }
       }
     }
@@ -294,7 +321,7 @@ export const LiveWorkoutPage: React.FC = () => {
       streamRef.current = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }, audio: false });
       if (!videoRef.current) throw new Error('camera view unavailable');
       videoRef.current.srcObject = streamRef.current; await videoRef.current.play();
-      repRef.current = 0; stageRef.current = 'up'; lastSpokenRef.current = '';
+      repRef.current = 0; stageRef.current = 'up'; lastSpokenRef.current = ''; autoAdvanceRef.current = false;
       setRepCount(0); setFormScore(0); setSessionSeconds(0); setIsTraining(true);
       speakFeedback('Starting real AI ' + selectedExercise + ' coaching. ' + targetReps + ' reps target.');
     } catch (err) {
