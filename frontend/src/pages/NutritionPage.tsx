@@ -11,6 +11,9 @@ export const NutritionPage: React.FC = () => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [analysisError, setAnalysisError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraVideoRef = useRef<HTMLVideoElement>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
   
   // Correction Form
   const [mealType, setMealType] = useState('Lunch');
@@ -73,6 +76,57 @@ export const NutritionPage: React.FC = () => {
       setAnalysisError(err?.message || 'Food image analysis failed. Please try another clear photo.');
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  const stopCamera = () => {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    if (cameraVideoRef.current) cameraVideoRef.current.srcObject = null;
+    setCameraOpen(false);
+  };
+
+  const openCamera = async () => {
+    setAnalysisError('');
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('Camera access is not supported by this browser.');
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      cameraStreamRef.current = stream;
+      setCameraOpen(true);
+      requestAnimationFrame(() => {
+        if (cameraVideoRef.current) {
+          cameraVideoRef.current.srcObject = stream;
+          void cameraVideoRef.current.play();
+        }
+      });
+    } catch (err: any) {
+      console.error(err);
+      setAnalysisError('Camera permission was denied or the camera is unavailable. Please allow camera access and try again.');
+    }
+  };
+
+  const captureCameraPhoto = async () => {
+    const video = cameraVideoRef.current;
+    if (!video || video.readyState < 2 || !video.videoWidth) {
+      setAnalysisError('Camera is not ready yet. Please wait a moment and try again.');
+      return;
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d')?.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.88));
+    stopCamera();
+    if (blob) {
+      const file = new File([blob], 'food-camera.jpg', { type: 'image/jpeg' });
+      await analyzeFile(file);
+    } else {
+      setAnalysisError('Could not capture the camera image. Please try again.');
     }
   };
 
@@ -159,17 +213,39 @@ export const NutritionPage: React.FC = () => {
             <p className="text-xs text-slate-400">
               Take a photo or choose a real food image. The selected image is sent to the configured vision AI.
             </p>
-            <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileChange} className="hidden" />
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
             <div className="flex flex-col sm:flex-row gap-2 justify-center">
-              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={analyzing} className="px-5 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-emerald-500 font-bold text-slate-950 text-xs shadow-glow">
-                {analyzing ? 'Analyzing Image...' : 'Capture / Upload Photo'}
+              <button type="button" onClick={openCamera} disabled={analyzing} className="px-5 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-emerald-500 font-bold text-slate-950 text-xs shadow-glow flex items-center justify-center gap-2">
+                <Camera className="w-4 h-4" />
+                {analyzing ? 'Analyzing Image...' : 'Open Camera'}
+              </button>
+              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={analyzing} className="px-5 py-2 rounded-xl border border-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-2">
+                <Upload className="w-4 h-4" /> Upload Photo
               </button>
               {imagePreview && !analyzing && (
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="px-5 py-2 rounded-xl border border-slate-700 text-slate-200 font-bold text-xs">
-                  Choose Another
+                <button type="button" onClick={openCamera} className="px-5 py-2 rounded-xl border border-slate-700 text-slate-200 font-bold text-xs">
+                  Take Another
                 </button>
               )}
             </div>
+            {cameraOpen && (
+              <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
+                <div className="w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-3xl p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-slate-100 flex items-center gap-2"><Camera className="w-5 h-5 text-sky-400" /> Food Camera</h4>
+                    <button type="button" onClick={stopCamera} className="text-slate-400 hover:text-white text-xl">×</button>
+                  </div>
+                  <video ref={cameraVideoRef} autoPlay playsInline muted className="w-full aspect-video object-cover rounded-2xl bg-black" />
+                  <p className="text-xs text-slate-400 text-center">Point the camera at the food, then tap Capture Photo.</p>
+                  <div className="flex gap-2 justify-center">
+                    <button type="button" onClick={captureCameraPhoto} className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-emerald-500 font-bold text-slate-950 text-xs flex items-center gap-2">
+                      <Camera className="w-4 h-4" /> Capture Photo
+                    </button>
+                    <button type="button" onClick={stopCamera} className="px-6 py-2.5 rounded-xl border border-slate-700 text-slate-200 font-bold text-xs">Cancel</button>
+                  </div>
+                </div>
+              </div>
+            )}
             {analysisError && <p className="text-xs text-red-400">{analysisError}</p>}
           </div>
 
