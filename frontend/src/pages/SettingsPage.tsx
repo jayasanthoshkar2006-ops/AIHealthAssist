@@ -2,13 +2,11 @@ import React, { useState } from 'react';
 import { useAuth } from '../store/AuthContext';
 import { apiRequest } from '../api/client';
 import { DisclaimerBanner } from '../components/common/DisclaimerBanner';
-import { Settings, Lock, Download, Trash2, Globe, Shield } from 'lucide-react';
+import { Settings, Lock, Download, Trash2 } from 'lucide-react';
 
 export const SettingsPage: React.FC = () => {
-  const { language, setLanguagePreference, logout } = useAuth();
+  const { logout } = useAuth();
   const [pin, setPin] = useState('');
-  const [oldPassword, setOldPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
   const [msg, setMsg] = useState('');
   const [appLockEnabled, setAppLockEnabled] = useState(
     localStorage.getItem('appLockEnabled') === 'true'
@@ -27,21 +25,6 @@ export const SettingsPage: React.FC = () => {
       setPin('');
     } catch (err: any) {
       alert(err.message || 'Failed to set PIN');
-    }
-  };
-
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await apiRequest('/auth/change-password', {
-        method: 'POST',
-        body: JSON.stringify({ old_password: oldPassword, new_password: newPassword })
-      });
-      setMsg('Password updated successfully!');
-      setOldPassword('');
-      setNewPassword('');
-    } catch (err: any) {
-      alert(err.message || 'Password update failed');
     }
   };
 
@@ -139,41 +122,6 @@ export const SettingsPage: React.FC = () => {
               Disable App Lock
             </button>
           )}
-        </div>
-
-        {/* Change Password */}
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
-          <h3 className="font-bold text-sm text-slate-100">Change Password</h3>
-
-          <form onSubmit={handleChangePassword} className="space-y-3 text-xs">
-            <div>
-              <label className="block text-slate-300 font-semibold mb-1">Current Password</label>
-              <input
-                type="password"
-                value={oldPassword}
-                onChange={(e) => setOldPassword(e.target.value)}
-                required
-                className="w-full px-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-100"
-              />
-            </div>
-            <div>
-              <label className="block text-slate-300 font-semibold mb-1">New Password</label>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                required
-                minLength={6}
-                className="w-full px-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-100"
-              />
-            </div>
-            <button
-              type="submit"
-              className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold text-xs border border-slate-700"
-            >
-              Update Password
-            </button>
-          </form>
         </div>
 
         {/* Data Ownership & Account Controls */}
