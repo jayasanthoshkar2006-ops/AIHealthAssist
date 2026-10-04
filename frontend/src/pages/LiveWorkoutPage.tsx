@@ -341,12 +341,36 @@ export const LiveWorkoutPage: React.FC = () => {
     }
   }, [isTraining, processFrame]);
 
-  const stopCamera = async () => {
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    streamRef.current?.getTracks().forEach(t => t.stop());
+  // Always release the browser camera when the live workout ends or this page is left.
+  // This prevents the webcam from remaining active in the background.
+  const releaseCamera = useCallback(() => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    streamRef.current?.getTracks().forEach(track => track.stop());
     streamRef.current = null;
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.srcObject = null;
+    }
+    window.speechSynthesis?.cancel();
+  }, []);
+
+  useEffect(() => {
+    const handlePageExit = () => releaseCamera();
+    window.addEventListener('pagehide', handlePageExit);
+    window.addEventListener('beforeunload', handlePageExit);
+    return () => {
+      window.removeEventListener('pagehide', handlePageExit);
+      window.removeEventListener('beforeunload', handlePageExit);
+      releaseCamera();
+    };
+  }, [releaseCamera]);
+
+  const stopCamera = async () => {
+    releaseCamera();
     setIsTraining(false);
-    if (videoRef.current) videoRef.current.srcObject = null;
     if (repRef.current === 0) {
       speakFeedback('Session ended. No completed repetitions were detected.');
       return;
