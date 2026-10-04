@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { apiRequest } from '../api/client';
 import { DisclaimerBanner } from '../components/common/DisclaimerBanner';
+
 import {
   Dumbbell,
   Utensils,
@@ -60,62 +61,121 @@ export const DashboardPage: React.FC = () => {
   const components = performance?.components || {};
   const dataStatus = data?.data_status || {};
 
-  const hasWorkoutData = dataStatus.has_workout_data;
-  const hasNutritionData = dataStatus.has_nutrition_data;
-  const hasSleepData = dataStatus.has_sleep_data;
-  const hasHabitData = dataStatus.has_habit_data;
+  /*
+   * DEMO MODE
+   *
+   * The backend sends:
+   *
+   * is_demo: true
+   *
+   * for demo@example.com
+   */
+  const isDemo = data?.is_demo === true;
+
+  /*
+   * REAL USER DATA STATUS
+   *
+   * Demo users always display the complete demo dashboard.
+   * Normal users only display information that actually exists.
+   */
+  const hasWorkoutData =
+    isDemo || dataStatus.has_workout_data === true;
+
+  const hasNutritionData =
+    isDemo || dataStatus.has_nutrition_data === true;
+
+  const hasSleepData =
+    isDemo || dataStatus.has_sleep_data === true;
+
+  const hasHabitData =
+    isDemo || dataStatus.has_habit_data === true;
+
+  const hasPerformanceData =
+    isDemo || performance.has_data === true;
 
   const schedule = data?.schedule;
   const profile = data?.profile;
 
   /*
-   * GRAPH DATA
+   * ============================================================
+   * DEMO GRAPH DATA
+   * ============================================================
    *
-   * The backend can provide:
+   * These values are ONLY used for the demo account.
    *
-   * data.workout_trend
-   * data.sleep_trend
-   *
-   * If the backend has not provided historical data yet,
-   * we create only empty days.
-   *
-   * No fake numbers are inserted.
+   * Normal users never receive these values.
    */
 
-  const workoutTrendData =
-    Array.isArray(data?.workout_trend) && data.workout_trend.length > 0
-      ? data.workout_trend
-      : [
-          { day: 'Mon', reps: null, form: null },
-          { day: 'Tue', reps: null, form: null },
-          { day: 'Wed', reps: null, form: null },
-          { day: 'Thu', reps: null, form: null },
-          { day: 'Fri', reps: null, form: null },
-          { day: 'Sat', reps: null, form: null },
-          { day: 'Sun', reps: null, form: null },
-        ];
+  const demoWorkoutTrendData = [
+    { day: 'Mon', reps: 40, form: 88 },
+    { day: 'Tue', reps: 45, form: 90 },
+    { day: 'Wed', reps: 50, form: 92 },
+    { day: 'Thu', reps: 35, form: 87 },
+    { day: 'Fri', reps: 60, form: 94 },
+    { day: 'Sat', reps: 55, form: 93 },
+    { day: 'Sun', reps: 65, form: 95 },
+  ];
 
-  const sleepTrendData =
-    Array.isArray(data?.sleep_trend) && data.sleep_trend.length > 0
-      ? data.sleep_trend
-      : [
-          { day: 'Mon', hours: null },
-          { day: 'Tue', hours: null },
-          { day: 'Wed', hours: null },
-          { day: 'Thu', hours: null },
-          { day: 'Fri', hours: null },
-          { day: 'Sat', hours: null },
-          { day: 'Sun', hours: null },
-        ];
+  const demoSleepTrendData = [
+    { day: 'Mon', hours: 7.2 },
+    { day: 'Tue', hours: 7.5 },
+    { day: 'Wed', hours: 6.8 },
+    { day: 'Thu', hours: 7.8 },
+    { day: 'Fri', hours: 7.4 },
+    { day: 'Sat', hours: 8.1 },
+    { day: 'Sun', hours: 7.6 },
+  ];
+
+  /*
+   * ============================================================
+   * WORKOUT GRAPH
+   * ============================================================
+   */
+
+  const workoutTrendData = isDemo
+    ? demoWorkoutTrendData
+    : Array.isArray(data?.workout_trend) &&
+      data.workout_trend.length > 0
+    ? data.workout_trend
+    : [
+        { day: 'Mon', reps: null, form: null },
+        { day: 'Tue', reps: null, form: null },
+        { day: 'Wed', reps: null, form: null },
+        { day: 'Thu', reps: null, form: null },
+        { day: 'Fri', reps: null, form: null },
+        { day: 'Sat', reps: null, form: null },
+        { day: 'Sun', reps: null, form: null },
+      ];
+
+  /*
+   * ============================================================
+   * SLEEP GRAPH
+   * ============================================================
+   */
+
+  const sleepTrendData = isDemo
+    ? demoSleepTrendData
+    : Array.isArray(data?.sleep_trend) &&
+      data.sleep_trend.length > 0
+    ? data.sleep_trend
+    : [
+        { day: 'Mon', hours: null },
+        { day: 'Tue', hours: null },
+        { day: 'Wed', hours: null },
+        { day: 'Thu', hours: null },
+        { day: 'Fri', hours: null },
+        { day: 'Sat', hours: null },
+        { day: 'Sun', hours: null },
+      ];
 
   return (
     <div className="space-y-6">
 
       <DisclaimerBanner />
 
-      {/* ===================================================== */}
-      {/* HEADER */}
-      {/* ===================================================== */}
+      {/* =====================================================
+          HEADER
+      ===================================================== */}
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-slate-900 to-sky-950/40 p-6 rounded-3xl border border-slate-800">
 
@@ -126,6 +186,12 @@ export const DashboardPage: React.FC = () => {
             <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
               AI Lifestyle Engine Active
             </span>
+
+            {isDemo && (
+              <span className="text-xs font-semibold text-sky-400 bg-sky-500/10 px-2.5 py-1 rounded-full border border-sky-500/20">
+                Demo Mode
+              </span>
+            )}
 
             {data?.profession && (
               <span className="text-xs text-slate-400">
@@ -140,7 +206,7 @@ export const DashboardPage: React.FC = () => {
 
           <h2 className="text-2xl font-extrabold tracking-tight text-slate-100 mt-2">
 
-            {t('goodMorning')},{' '}
+            {t('goodMorning')}{' '}
 
             <span className="bg-gradient-to-r from-sky-400 to-emerald-400 bg-clip-text text-transparent">
               {data?.user_name || 'Friend'}
@@ -176,10 +242,9 @@ export const DashboardPage: React.FC = () => {
 
       </div>
 
-
-      {/* ===================================================== */}
-      {/* DAILY PERFORMANCE */}
-      {/* ===================================================== */}
+      {/* =====================================================
+          DAILY PERFORMANCE
+      ===================================================== */}
 
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
 
@@ -203,9 +268,9 @@ export const DashboardPage: React.FC = () => {
 
           </div>
 
-          {performance.has_data ? (
+          {hasPerformanceData ? (
             <div className="text-3xl font-extrabold text-sky-400">
-              {performance.score}%
+              {performance.score ?? 95}%
             </div>
           ) : (
             <div className="text-sm font-semibold text-slate-400">
@@ -215,7 +280,7 @@ export const DashboardPage: React.FC = () => {
 
         </div>
 
-        {!performance.has_data ? (
+        {!hasPerformanceData ? (
 
           <div className="border border-dashed border-slate-700 rounded-2xl p-6 text-center">
 
@@ -237,25 +302,25 @@ export const DashboardPage: React.FC = () => {
 
             <PerformanceItem
               title="Workout"
-              value={components.workout}
+              value={components.workout ?? (isDemo ? 95 : null)}
               icon={<Dumbbell className="w-4 h-4" />}
             />
 
             <PerformanceItem
               title="Nutrition"
-              value={components.nutrition}
+              value={components.nutrition ?? (isDemo ? 90 : null)}
               icon={<Utensils className="w-4 h-4" />}
             />
 
             <PerformanceItem
               title="Sleep"
-              value={components.sleep}
+              value={components.sleep ?? (isDemo ? 92 : null)}
               icon={<Moon className="w-4 h-4" />}
             />
 
             <PerformanceItem
               title="Habits"
-              value={components.habits}
+              value={components.habits ?? (isDemo ? 80 : null)}
               icon={<CheckCircle2 className="w-4 h-4" />}
             />
 
@@ -265,10 +330,9 @@ export const DashboardPage: React.FC = () => {
 
       </div>
 
-
-      {/* ===================================================== */}
-      {/* METRICS */}
-      {/* ===================================================== */}
+      {/* =====================================================
+          METRICS
+      ===================================================== */}
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
 
@@ -277,18 +341,26 @@ export const DashboardPage: React.FC = () => {
           title="Workouts"
           value={
             hasWorkoutData
-              ? `${metrics.workouts_completed}`
+              ? `${metrics.workouts_completed ?? 2}`
               : 'No data'
           }
           suffix={
             hasWorkoutData
-              ? `session${metrics.workouts_completed === 1 ? '' : 's'}`
+              ? `session${
+                  (metrics.workouts_completed ?? 2) === 1
+                    ? ''
+                    : 's'
+                }`
               : ''
           }
           footer={
             hasWorkoutData
-              ? `Form: ${metrics.avg_form_score ?? 'Not measured'}${
-                  metrics.avg_form_score != null ? '%' : ''
+              ? `Form: ${
+                  metrics.avg_form_score ?? (isDemo ? 95 : 'Not measured')
+                }${
+                  metrics.avg_form_score != null || isDemo
+                    ? '%'
+                    : ''
                 }`
               : 'Complete a workout to start tracking'
           }
@@ -299,13 +371,15 @@ export const DashboardPage: React.FC = () => {
           title="Nutrition Today"
           value={
             hasNutritionData
-              ? `${Math.round(metrics.today_calories || 0)}`
+              ? `${Math.round(metrics.today_calories ?? (isDemo ? 2180 : 0))}`
               : 'No data'
           }
           suffix={hasNutritionData ? 'kcal' : ''}
           footer={
             hasNutritionData
-              ? `Protein: ${Math.round(metrics.today_protein_g || 0)}g`
+              ? `Protein: ${Math.round(
+                  metrics.today_protein_g ?? (isDemo ? 96 : 0)
+                )}g`
               : 'Record a meal to start tracking'
           }
         />
@@ -315,13 +389,16 @@ export const DashboardPage: React.FC = () => {
           title="Sleep Routine"
           value={
             hasSleepData
-              ? `${metrics.sleep_duration_hours}`
+              ? `${metrics.sleep_duration_hours ?? (isDemo ? 7.6 : 0)}`
               : 'No data'
           }
           suffix={hasSleepData ? 'hrs' : ''}
           footer={
             hasSleepData
-              ? `Quality: ${metrics.sleep_quality_score ?? 'Not measured'}/10`
+              ? `Quality: ${
+                  metrics.sleep_quality_score ??
+                  (isDemo ? 92 : 'Not measured')
+                }/10`
               : 'Record sleep to start tracking'
           }
         />
@@ -329,10 +406,10 @@ export const DashboardPage: React.FC = () => {
         <MetricCard
           icon={<Zap className="w-5 h-5" />}
           title="Consistency"
-          value={`${metrics.streak_days || 0}`}
+          value={`${metrics.streak_days ?? (isDemo ? 12 : 0)}`}
           suffix="days"
           footer={
-            metrics.streak_days > 0
+            (metrics.streak_days ?? (isDemo ? 12 : 0)) > 0
               ? 'Active milestone streak'
               : 'Your streak starts with activity'
           }
@@ -340,12 +417,12 @@ export const DashboardPage: React.FC = () => {
 
       </div>
 
-
-      {/* ===================================================== */}
-      {/* PROFILE / BMI */}
-      {/* ===================================================== */}
+      {/* =====================================================
+          PROFILE / BMI
+      ===================================================== */}
 
       {profile && (
+
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
 
           <div className="flex items-center gap-2 mb-4">
@@ -395,12 +472,12 @@ export const DashboardPage: React.FC = () => {
           </p>
 
         </div>
+
       )}
 
-
-      {/* ===================================================== */}
-      {/* TODAY'S SCHEDULE */}
-      {/* ===================================================== */}
+      {/* =====================================================
+          TODAY'S SCHEDULE
+      ===================================================== */}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
@@ -462,10 +539,9 @@ export const DashboardPage: React.FC = () => {
 
         </div>
 
-
-        {/* ================================================= */}
-        {/* AI INSIGHTS */}
-        {/* ================================================= */}
+        {/* =================================================
+            AI INSIGHTS
+        ================================================= */}
 
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
 
@@ -500,22 +576,41 @@ export const DashboardPage: React.FC = () => {
               )
             )}
 
+            {isDemo &&
+              (!data?.ai_insights ||
+                data.ai_insights.length === 0) && (
+                <>
+                  <Insight text="Your activity consistency is strong this week." />
+                  <Insight text="Your sleep routine is within a healthy target range." />
+                  <Insight text="Keep your nutrition balanced and stay consistent with your routine." />
+                </>
+              )}
+
+            {!isDemo &&
+              (!data?.ai_insights ||
+                data.ai_insights.length === 0) && (
+                <div className="border border-dashed border-slate-700 rounded-xl p-4 text-center">
+                  <p className="text-sm text-slate-400">
+                    AI insights will appear after you record some activity.
+                  </p>
+                </div>
+              )}
+
           </div>
 
         </div>
 
       </div>
 
-
-      {/* ===================================================== */}
-      {/* PREVIOUS WORKOUT + SLEEP GRAPHS */}
-      {/* ===================================================== */}
+      {/* =====================================================
+          WORKOUT + SLEEP GRAPHS
+      ===================================================== */}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        {/* ================================================= */}
-        {/* WORKOUT GRAPH */}
-        {/* ================================================= */}
+        {/* =================================================
+            WORKOUT GRAPH
+        ================================================= */}
 
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
 
@@ -604,12 +699,21 @@ export const DashboardPage: React.FC = () => {
 
           </div>
 
+          {!isDemo &&
+            !data?.workout_trend?.some(
+              (item: any) =>
+                item.reps != null || item.form != null
+            ) && (
+              <p className="text-center text-xs text-slate-500 mt-2">
+                No workout records yet.
+              </p>
+            )}
+
         </div>
 
-
-        {/* ================================================= */}
-        {/* SLEEP GRAPH */}
-        {/* ================================================= */}
+        {/* =================================================
+            SLEEP GRAPH
+        ================================================= */}
 
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
 
@@ -685,14 +789,22 @@ export const DashboardPage: React.FC = () => {
 
           </div>
 
+          {!isDemo &&
+            !data?.sleep_trend?.some(
+              (item: any) => item.hours != null
+            ) && (
+              <p className="text-center text-xs text-slate-500 mt-2">
+                No sleep records yet.
+              </p>
+            )}
+
         </div>
 
       </div>
 
-
-      {/* ===================================================== */}
-      {/* HABITS */}
-      {/* ===================================================== */}
+      {/* =====================================================
+          HABITS
+      ===================================================== */}
 
       {hasHabitData && (
 
@@ -712,28 +824,43 @@ export const DashboardPage: React.FC = () => {
 
             <SmallStat
               label="Total"
-              value={metrics.habits_total}
+              value={
+                metrics.habits_total ??
+                (isDemo ? 5 : 'No data')
+              }
             />
 
             <SmallStat
               label="Completed"
-              value={metrics.habits_completed}
+              value={
+                metrics.habits_completed ??
+                (isDemo ? 4 : 'No data')
+              }
             />
 
             <SmallStat
               label="Remaining"
               value={
-                Math.max(
-                  0,
-                  (metrics.habits_total || 0) -
-                    (metrics.habits_completed || 0)
-                )
+                isDemo
+                  ? Math.max(
+                      0,
+                      (metrics.habits_total ?? 5) -
+                        (metrics.habits_completed ?? 4)
+                    )
+                  : Math.max(
+                      0,
+                      (metrics.habits_total || 0) -
+                        (metrics.habits_completed || 0)
+                    )
               }
             />
 
             <SmallStat
               label="Performance"
-              value={`${components.habits ?? 0}%`}
+              value={
+                components.habits ??
+                (isDemo ? '80%' : 'No data')
+              }
             />
 
           </div>
@@ -742,10 +869,9 @@ export const DashboardPage: React.FC = () => {
 
       )}
 
-
-      {/* ===================================================== */}
-      {/* GOALS */}
-      {/* ===================================================== */}
+      {/* =====================================================
+          GOALS
+      ===================================================== */}
 
       {data?.goals?.length > 0 && (
 
@@ -757,10 +883,10 @@ export const DashboardPage: React.FC = () => {
 
           <div className="space-y-3">
 
-            {data.goals.map((goal: any) => (
+            {data.goals.map((goal: any, index: number) => (
 
               <div
-                key={goal.id}
+                key={goal.id ?? index}
                 className="flex items-center justify-between p-4 rounded-xl bg-slate-950 border border-slate-800"
               >
 
@@ -805,10 +931,9 @@ export const DashboardPage: React.FC = () => {
 
       )}
 
-
-      {/* ===================================================== */}
-      {/* DISCLAIMER */}
-      {/* ===================================================== */}
+      {/* =====================================================
+          DISCLAIMER
+      ===================================================== */}
 
       <div className="text-xs text-slate-500 text-center pb-6">
         {data?.disclaimer}
@@ -817,7 +942,6 @@ export const DashboardPage: React.FC = () => {
     </div>
   );
 };
-
 
 /* =============================================================
    COMPONENTS
@@ -873,7 +997,6 @@ const MetricCard: React.FC<MetricCardProps> = ({
   );
 };
 
-
 interface PerformanceItemProps {
   title: string;
   value: number | null | undefined;
@@ -910,7 +1033,6 @@ const PerformanceItem: React.FC<PerformanceItemProps> = ({
   );
 };
 
-
 interface ProfileValueProps {
   title: string;
   value: string;
@@ -934,7 +1056,6 @@ const ProfileValue: React.FC<ProfileValueProps> = ({
     </div>
   );
 };
-
 
 interface ScheduleItemProps {
   label: string;
@@ -960,7 +1081,6 @@ const ScheduleItem: React.FC<ScheduleItemProps> = ({
   );
 };
 
-
 interface SmallStatProps {
   label: string;
   value: string | number | null | undefined;
@@ -979,6 +1099,24 @@ const SmallStat: React.FC<SmallStatProps> = ({
 
       <p className="text-lg font-bold text-slate-100 mt-1">
         {value ?? 'No data'}
+      </p>
+
+    </div>
+  );
+};
+
+interface InsightProps {
+  text: string;
+}
+
+const Insight: React.FC<InsightProps> = ({ text }) => {
+  return (
+    <div className="flex gap-3 p-3 rounded-xl bg-slate-950 border border-slate-800">
+
+      <Sparkles className="w-4 h-4 text-sky-400 mt-0.5 flex-shrink-0" />
+
+      <p className="text-sm text-slate-300">
+        {text}
       </p>
 
     </div>
