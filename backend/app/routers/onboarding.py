@@ -1,8 +1,9 @@
 import json
+from datetime import date
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models.domain_models import User, UserProfile, UserSchedule, EnvironmentResource, Goal
+from app.models.domain_models import User, UserProfile, UserSchedule, EnvironmentResource, Goal, DailyPlan
 from app.schemas.domain_schemas import OnboardingData, ProfileResponse
 from app.routers.auth import get_current_user
 from app.ai.factory import get_ai_provider
@@ -13,7 +14,7 @@ router = APIRouter(prefix="/onboarding", tags=["Onboarding & Profile"])
 def submit_onboarding(data: OnboardingData, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     # Check if profile already exists
     existing_profile = db.query(UserProfile).filter(UserProfile.user_id == current_user.id).first()
-    
+
     equip_str = ", ".join(data.available_equipment) if data.available_equipment else "Bodyweight"
     foods_str = ", ".join(data.available_foods) if data.available_foods else "Standard Pantry"
 
@@ -69,9 +70,16 @@ def submit_onboarding(data: OnboardingData, current_user: User = Depends(get_cur
         )
         db.add(profile)
 
-    # Save user schedule
+    # Save or update the user's schedule.
+    # Re-onboarding must replace old times; otherwise an earlier wake time
+    # remains stored and the daily planner keeps using the stale schedule.
     existing_sched = db.query(UserSchedule).filter(UserSchedule.user_id == current_user.id).first()
-    if not existing_sched:
+    if existing_sched:
+        existing_sched.wake_time = data.wake_time
+        existing_sched.sleep_time = data.sleep_time
+        existing_sched.work_start = data.work_start
+        existing_sched.work_end = data.work_end
+    else:
         sched = UserSchedule(
             user_id=current_user.id,
             wake_time=data.wake_time,
@@ -80,6 +88,14 @@ def submit_onboarding(data: OnboardingData, current_user: User = Depends(get_cur
             work_end=data.work_end
         )
         db.add(sched)
+
+    # Force today's plan to regenerate from the newly saved schedule.
+    # This prevents a previously generated plan (for example, 06:30 wake-up)
+    # from remaining visible after the user changes it to 06:00.
+    db.query(DailyPlan).filter(
+        DailyPlan.user_id == current_user.id,
+        DailyPlan.plan_date == date.today()
+    ).delete(synchronize_session=False)
 
     # Save environment resources
     existing_res = db.query(EnvironmentResource).filter(EnvironmentResource.user_id == current_user.id).first()
@@ -92,6 +108,11 @@ def submit_onboarding(data: OnboardingData, current_user: User = Depends(get_cur
             budget_tier=data.food_budget
         )
         db.add(res)
+    else:
+        existing_res.equipment_list = data.available_equipment or []
+        existing_res.pantry_foods = data.available_foods or []
+        existing_res.cooking_access = data.cooking_availability
+        existing_res.budget_tier = data.food_budget
 
     # Save initial goals
     if data.primary_goals:
