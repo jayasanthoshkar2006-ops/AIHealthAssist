@@ -82,7 +82,7 @@ const ProtectedLayout: React.FC = () => {
             onClick={async () => {
               const input = document.getElementById('app-lock-pin') as HTMLInputElement | null;
               const pinValue = input?.value || '';
-              if (!/^d{4,6}$/.test(pinValue)) {
+              if (!/^\d{4,6}$/.test(pinValue)) {
                 alert('Enter your 4-6 digit PIN');
                 input?.focus();
                 return;
