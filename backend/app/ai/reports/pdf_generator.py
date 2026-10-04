@@ -2,6 +2,7 @@ import os
 import io
 from datetime import date
 from typing import Dict, Any, List
+from xml.sax.saxutils import escape
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -73,14 +74,15 @@ class PDFReportGenerator:
 
         # Header Title
         story.append(Paragraph(f"AI Personal Wellness & Lifestyle Report", title_style))
-        story.append(Paragraph(f"Prepared for: <b>{user_name}</b> | Date: {date.today().strftime('%B %d, %Y')}", subtitle_style))
+        safe_user_name = escape(str(user_name))
+        story.append(Paragraph(f"Prepared for: <b>{safe_user_name}</b> | Date: {date.today().strftime('%B %d, %Y')}", subtitle_style))
         story.append(Spacer(1, 10))
         story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#e2e8f0'), spaceAfter=15))
 
         # Executive Summary
         story.append(Paragraph("1. Executive Summary & AI Observations", section_heading))
         obs = report_data.get("ai_observations", "Your overall consistency across physical workout sessions and sleep discipline shows steady progress.")
-        story.append(Paragraph(f"<b>AI Observation:</b> {obs}", body_style))
+        story.append(Paragraph(f"<b>AI Observation:</b> {escape(str(obs))}", body_style))
         story.append(Spacer(1, 10))
 
         # Workout Summary
@@ -131,7 +133,7 @@ class PDFReportGenerator:
         # Recommended Focus
         story.append(Paragraph("6. Next Suggested Focus", section_heading))
         focus = report_data.get("next_suggested_focus", "Focus on maintaining hydration during afternoon work hours and increasing post-workout protein intake.")
-        story.append(Paragraph(f"• {focus}", body_style))
+        story.append(Paragraph(f"• {escape(str(focus))}", body_style))
         story.append(Spacer(1, 25))
 
         # Disclaimer
