@@ -21,6 +21,7 @@ import { AssistantPage } from './pages/AssistantPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { PrivacyPage } from './pages/PrivacyPage';
+import { NotificationScheduler } from './components/common/NotificationScheduler';
 
 const ProtectedLayout: React.FC = () => {
   const { token, hasProfile, isLocked, unlockApp } = useAuth();
@@ -60,7 +61,9 @@ const ProtectedLayout: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+    <>
+      <NotificationScheduler />
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
       <Navbar />
       <div className="flex flex-1">
         <Sidebar />
@@ -85,6 +88,7 @@ const ProtectedLayout: React.FC = () => {
         </main>
       </div>
     </div>
+    </>
   );
 };
 
