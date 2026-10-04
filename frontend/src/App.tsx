@@ -44,13 +44,70 @@ const ProtectedLayout: React.FC = () => {
           <h2 className="font-extrabold text-lg text-slate-100">App Locked</h2>
           <p className="text-xs text-slate-400">Enter PIN code to unlock HealthAssist AI</p>
           <input
+            id="app-lock-pin"
             type="password"
-            placeholder="••••"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            placeholder="Enter PIN"
             maxLength={6}
+            autoFocus
             className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-center font-bold text-lg text-slate-100 focus:outline-none"
+            onKeyDown={async (e) => {
+              if (e.key === 'Enter') {
+                const input = e.currentTarget;
+                try {
+                  const result = await fetch('https://aihealthassist-backend.onrender.com/api/v1/auth/pin/verify', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ pin_code: input.value }),
+                  });
+                  const data = await result.json();
+                  if (result.ok && data.valid) {
+                    unlockApp();
+                  } else {
+                    input.value = '';
+                    input.focus();
+                    alert('Incorrect PIN');
+                  }
+                } catch {
+                  alert('Unable to verify PIN. Please try again.');
+                }
+              }
+            }}
           />
           <button
-            onClick={unlockApp}
+            onClick={async () => {
+              const input = document.getElementById('app-lock-pin') as HTMLInputElement | null;
+              const pinValue = input?.value || '';
+              if (!/^d{4,6}$/.test(pinValue)) {
+                alert('Enter your 4-6 digit PIN');
+                input?.focus();
+                return;
+              }
+              try {
+                const result = await fetch('https://aihealthassist-backend.onrender.com/api/v1/auth/pin/verify', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({ pin_code: pinValue }),
+                });
+                const data = await result.json();
+                if (result.ok && data.valid) {
+                  unlockApp();
+                } else {
+                  if (input) input.value = '';
+                  input?.focus();
+                  alert('Incorrect PIN');
+                }
+              } catch {
+                alert('Unable to verify PIN. Please try again.');
+              }
+            }
             className="w-full py-3 rounded-xl bg-gradient-to-r from-sky-500 to-emerald-500 font-bold text-slate-950 text-xs shadow-glow"
           >
             Unlock Application
