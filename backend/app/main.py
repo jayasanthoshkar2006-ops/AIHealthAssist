@@ -25,7 +25,18 @@ from app.auth.security import get_password_hash
 # Create tables automatically for SQLite local fallback or Postgres
 Base.metadata.create_all(bind=engine)
 
-# Add the demo flag to existing SQLite databases.\nif settings.DATABASE_URL.startswith("sqlite"):\n    from sqlalchemy import inspect, text\n    if "is_demo" not in {c["name"] for c in inspect(engine).get_columns("users")}:\n        with engine.begin() as connection:\n            connection.execute(text("ALTER TABLE users ADD COLUMN is_demo BOOLEAN NOT NULL DEFAULT 0"))\n
+# Add columns introduced after the initial database schema.
+# This keeps existing SQLite and PostgreSQL deployments compatible.
+from sqlalchemy import inspect, text
+
+user_columns = {column["name"] for column in inspect(engine).get_columns("users")}
+
+with engine.begin() as connection:
+    if "language" not in user_columns:
+        connection.execute(text("ALTER TABLE users ADD COLUMN language VARCHAR(10) DEFAULT 'en'"))
+    if "is_demo" not in user_columns:
+        connection.execute(text("ALTER TABLE users ADD COLUMN is_demo BOOLEAN NOT NULL DEFAULT FALSE"))
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
