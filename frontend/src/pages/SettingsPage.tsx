@@ -10,6 +10,9 @@ export const SettingsPage: React.FC = () => {
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [msg, setMsg] = useState('');
+  const [appLockEnabled, setAppLockEnabled] = useState(
+    localStorage.getItem('appLockEnabled') === 'true'
+  );
 
   const handleSetPin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,7 +21,9 @@ export const SettingsPage: React.FC = () => {
         method: 'POST',
         body: JSON.stringify({ pin_code: pin })
       });
-      setMsg('App Lock PIN configured successfully!');
+      localStorage.setItem('appLockEnabled', 'true');
+      setAppLockEnabled(true);
+      setMsg('App Lock enabled. The app will require your PIN when reopened.');
       setPin('');
     } catch (err: any) {
       alert(err.message || 'Failed to set PIN');
@@ -89,6 +94,18 @@ export const SettingsPage: React.FC = () => {
             <Lock className="w-4 h-4 text-sky-400" /> Setup App Lock PIN
           </h3>
 
+          <div className="flex items-center justify-between rounded-xl bg-slate-950 border border-slate-800 px-4 py-3">
+            <div>
+              <p className="text-xs font-semibold text-slate-200">App Lock Status</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                {appLockEnabled ? 'Enabled — PIN required when the app is reopened.' : 'Disabled'}
+              </p>
+            </div>
+            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${appLockEnabled ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
+              {appLockEnabled ? 'ON' : 'OFF'}
+            </span>
+          </div>
+
           <form onSubmit={handleSetPin} className="space-y-3 text-xs">
             <div>
               <label className="block text-slate-300 font-semibold mb-1">4-6 Digit Security PIN</label>
@@ -106,9 +123,22 @@ export const SettingsPage: React.FC = () => {
               type="submit"
               className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 font-bold text-xs border border-slate-700"
             >
-              Set PIN Code
+              {appLockEnabled ? 'Change PIN & Keep Lock Enabled' : 'Set PIN & Enable App Lock'}
             </button>
           </form>
+          {appLockEnabled && (
+            <button
+              type="button"
+              onClick={() => {
+                localStorage.removeItem('appLockEnabled');
+                setAppLockEnabled(false);
+                setMsg('App Lock disabled.');
+              }}
+              className="w-full py-2 rounded-xl bg-red-950/30 hover:bg-red-950/50 text-red-400 font-semibold text-xs border border-red-500/20"
+            >
+              Disable App Lock
+            </button>
+          )}
         </div>
 
         {/* Change Password */}
