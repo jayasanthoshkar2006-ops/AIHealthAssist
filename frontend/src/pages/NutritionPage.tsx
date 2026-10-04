@@ -28,7 +28,10 @@ export const NutritionPage: React.FC = () => {
       .catch((err) => console.error(err));
 
     apiRequest('/nutrition/remembered-foods')
-      .then((res) => setRememberedFoods(res.foods || []))
+      .then((res) => {
+        const data = res as { foods?: any[] };
+        setRememberedFoods(data.foods || []);
+      }
       .catch((err) => console.error(err));
   };
 
