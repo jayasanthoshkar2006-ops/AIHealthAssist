@@ -93,7 +93,7 @@ export const NutritionPage: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
           <p className="text-xs text-slate-400">Total Calories</p>
-          <p className="text-2xl font-extrabold text-slate-100 mt-1">{summary?.total_calories || 0} / 2200 kcal</p>
+          <p className="text-2xl font-extrabold text-slate-100 mt-1">{summary?.total_calories || 0} / {summary?.calorie_target || '—'} kcal</p>
         </div>
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
           <p className="text-xs text-slate-400">Protein</p>
