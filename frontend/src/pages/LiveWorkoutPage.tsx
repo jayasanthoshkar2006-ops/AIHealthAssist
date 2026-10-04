@@ -165,6 +165,7 @@ export const LiveWorkoutPage: React.FC = () => {
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [cameraError, setCameraError] = useState('');
   const [modelLoading, setModelLoading] = useState(false);
+  const [modelReady, setModelReady] = useState(false);
   const [suggested, setSuggested] = useState<ExerciseConfig[]>([]);
   const [sessionSeconds, setSessionSeconds] = useState(0);
 
@@ -198,6 +199,24 @@ export const LiveWorkoutPage: React.FC = () => {
   useEffect(() => {
     setTargetReps(targetFor(profile, exercise));
   }, [profile, selectedExercise]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadPoseModel = useCallback(async () => {
+    if (poseRef.current) { setModelReady(true); return; }
+    setModelLoading(true); setCameraError('');
+    try {
+      const vision = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm');
+      try {
+        poseRef.current = await PoseLandmarker.createFromOptions(vision, { baseOptions: { modelAssetPath: POSE_MODEL_URL, delegate: 'GPU' }, runningMode: 'VIDEO', numPoses: 1, minPoseDetectionConfidence: 0.5, minPosePresenceConfidence: 0.5, minTrackingConfidence: 0.5 });
+      } catch (gpuError) {
+        console.warn('MediaPipe GPU initialization failed; retrying with CPU.', gpuError);
+        poseRef.current = await PoseLandmarker.createFromOptions(vision, { baseOptions: { modelAssetPath: POSE_MODEL_URL, delegate: 'CPU' }, runningMode: 'VIDEO', numPoses: 1, minPoseDetectionConfidence: 0.5, minPosePresenceConfidence: 0.5, minTrackingConfidence: 0.5 });
+      }
+      setModelReady(true);
+    } catch (err) { console.error(err); setModelReady(false); setCameraError('AI model preparation failed. Check internet access and refresh the page to try again.'); }
+    finally { setModelLoading(false); }
+  }, []);
+
+  useEffect(() => { void loadPoseModel(); }, [loadPoseModel]);
 
   useEffect(() => {
     if (!isTraining) return;
@@ -250,14 +269,16 @@ export const LiveWorkoutPage: React.FC = () => {
         const form = formFeedback(selectedExercise, points, measurement);
         setFormScore(Math.round(form.score));
         setFeedback(form.feedback);
+        const visibility = avgVisibility(points, [11, 12, 23, 24, 25, 26, 27, 28]);
+        const canCountRep = visibility >= 0.65 && form.score >= 65 && repRef.current < targetReps;
         const nextStage = exerciseState(selectedExercise, measurement, stageRef.current);
-        if (nextStage === 'down' && stageRef.current === 'up') {
+        if (canCountRep && nextStage === 'down' && stageRef.current === 'up') {
           stageRef.current = 'down';
-        } else if (nextStage === 'up' && stageRef.current === 'down') {
+        } else if (canCountRep && nextStage === 'up' && stageRef.current === 'down') {
           stageRef.current = 'up';
-          repRef.current += 1;
+          repRef.current = Math.min(targetReps, repRef.current + 1);
           setRepCount(repRef.current);
-          speakFeedback(form.feedback || `Rep ${repRef.current} complete`);
+          speakFeedback(repRef.current >= targetReps ? 'Target complete. ' + targetReps + ' repetitions finished.' : (form.feedback || 'Rep ' + repRef.current + ' complete'));
         }
       }
     }
@@ -266,66 +287,23 @@ export const LiveWorkoutPage: React.FC = () => {
 
   const startCamera = async () => {
     setCameraError('');
-    setModelLoading(true);
+    if (!poseRef.current || !modelReady) await loadPoseModel();
+    if (!poseRef.current) { setCameraError('AI model is still preparing. Please wait a moment and try again.'); return; }
     try {
-      if (!poseRef.current) {
-        const vision = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm');
-        try {
-          poseRef.current = await PoseLandmarker.createFromOptions(vision, {
-            baseOptions: { modelAssetPath: POSE_MODEL_URL, delegate: 'GPU' },
-          runningMode: 'VIDEO',
-          numPoses: 1,
-          minPoseDetectionConfidence: 0.5,
-          minPosePresenceConfidence: 0.5,
-            minTrackingConfidence: 0.5,
-          });
-        } catch (gpuError) {
-          console.warn('MediaPipe GPU initialization failed; retrying with CPU.', gpuError);
-          poseRef.current = await PoseLandmarker.createFromOptions(vision, {
-            baseOptions: { modelAssetPath: POSE_MODEL_URL, delegate: 'CPU' },
-            runningMode: 'VIDEO',
-            numPoses: 1,
-            minPoseDetectionConfidence: 0.5,
-            minPosePresenceConfidence: 0.5,
-            minTrackingConfidence: 0.5,
-          });
-        }
-      }
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error('Camera access is not available in this browser or page context.');
-      }
-      streamRef.current = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
-        audio: false,
-      });
-      if (!videoRef.current) throw new Error('Camera view is unavailable.');
-      videoRef.current.srcObject = streamRef.current;
-      await videoRef.current.play();
-      repRef.current = 0;
-      stageRef.current = 'up';
-      lastSpokenRef.current = '';
-      setRepCount(0);
-      setFormScore(0);
-      setSessionSeconds(0);
-      setIsTraining(true);
-      speakFeedback(`Starting real AI ${selectedExercise} coaching. ${targetReps} reps target.`);
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error('camera unavailable');
+      streamRef.current = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }, audio: false });
+      if (!videoRef.current) throw new Error('camera view unavailable');
+      videoRef.current.srcObject = streamRef.current; await videoRef.current.play();
+      repRef.current = 0; stageRef.current = 'up'; lastSpokenRef.current = '';
+      setRepCount(0); setFormScore(0); setSessionSeconds(0); setIsTraining(true);
+      speakFeedback('Starting real AI ' + selectedExercise + ' coaching. ' + targetReps + ' reps target.');
     } catch (err) {
       console.error(err);
       const message = err instanceof Error ? err.message.toLowerCase() : '';
-      if (message.includes('permission') || message.includes('notallowed') || message.includes('denied')) {
-        setCameraError('Camera permission was blocked. Allow camera access for this site, then click Start Real Session again.');
-      } else if (message.includes('network') || message.includes('fetch') || message.includes('load') || message.includes('wasm') || message.includes('model')) {
-        setCameraError('The AI pose model could not be downloaded. Check your internet connection, refresh the page, and try again.');
-      } else {
-        setCameraError('Live AI could not start. Check camera permission and internet access, then try again.');
-      }
-      streamRef.current?.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
-    } finally {
-      setModelLoading(false);
+      setCameraError(message.includes('permission') || message.includes('denied') ? 'Camera permission was blocked. Allow camera access for this site, then try again.' : 'Camera could not start. Check browser camera permission and try again.');
+      streamRef.current?.getTracks().forEach(t => t.stop()); streamRef.current = null;
     }
   };
-
   useEffect(() => {
     if (isTraining) {
       rafRef.current = requestAnimationFrame(processFrame);
