@@ -50,8 +50,12 @@ def calculate_daily_calorie_target(profile: UserProfile, goals: list[Goal] | Non
 
 @router.post("/analyze-image", response_model=FoodAnalysisResponse)
 def analyze_food_image(data: FoodImageAnalyzeRequest):
+    if not data.image_base64 or len(data.image_base64) < 100:
+        raise HTTPException(status_code=400, detail="A real food image is required.")
+    if len(data.image_base64) > 12_000_000:
+        raise HTTPException(status_code=413, detail="Image is too large. Please use an image smaller than 8 MB.")
     ai = get_ai_provider()
-    res = ai.analyze_food_image(data.image_base64, data.meal_type or "Lunch")
+    res = ai.analyze_food_image(data.image_base64, data.meal_type or "Lunch", data.mime_type or "image/jpeg")
     return FoodAnalysisResponse(
         food_name=res["food_name"],
         estimated_serving=res["estimated_serving"],
