@@ -1,7 +1,8 @@
 import React from 'react';
 import { useAuth } from '../../store/AuthContext';
 import { useTranslation } from 'react-i18next';
-import { Globe, Bell, Lock, LogOut, User as UserIcon, Sparkles } from 'lucide-react';
+import { Globe, Lock, LogOut, User as UserIcon, Sparkles } from 'lucide-react';
+import { NotificationCenter } from './NotificationCenter';
 
 export const Navbar: React.FC = () => {
   const { userEmail, language, setLanguagePreference, logout, lockApp } = useAuth();
@@ -46,13 +47,7 @@ export const Navbar: React.FC = () => {
         </button>
 
         {/* Notifications */}
-        <button
-          className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white relative transition-all"
-          title="Notifications"
-        >
-          <Bell className="w-4 h-4" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-        </button>
+        <NotificationCenter />
 
         {/* Profile Avatar */}
         <div className="flex items-center gap-2 border-l border-slate-800 pl-3">
