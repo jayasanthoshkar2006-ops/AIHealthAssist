@@ -171,7 +171,16 @@ export const DashboardPage: React.FC = () => {
   return (
     <div className="space-y-6">
 
-      <DisclaimerBanner />\n\n      {isDemo && (\n        <div className="rounded-2xl border border-sky-500/30 bg-sky-500/10 px-4 py-3">\n          <p className="text-sm font-semibold text-sky-300">Demo Mode</p>\n          <p className="text-xs text-slate-300 mt-1">\n            {data?.demo_notice || "This account contains sample data for demonstrating HealthAssist AI. It is not real health information."}\n          </p>\n        </div>\n      )}
+      <DisclaimerBanner />
+
+      {isDemo && (
+        <div className="rounded-2xl border border-sky-500/30 bg-sky-500/10 px-4 py-3">
+          <p className="text-sm font-semibold text-sky-300">Demo Mode</p>
+          <p className="text-xs text-slate-300 mt-1">
+            {data?.demo_notice || "This account contains sample data for demonstrating HealthAssist AI. It is not real health information."}
+          </p>
+        </div>
+      )}
 
       {/* =====================================================
           HEADER
