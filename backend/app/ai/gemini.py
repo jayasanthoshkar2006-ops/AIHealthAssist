@@ -91,7 +91,7 @@ class GeminiProvider(BaseAIProvider):
                 prompt,
                 {"mime_type": mime_type, "data": image_base64}
             ])
-            text = response.text.replace("\`\`\`json", "").replace("\`\`\`", "").strip()
+            text = response.text.replace("```json", "").replace("```", "").strip()
             result = json.loads(text)
             return {
                 "food_name": str(result.get("food_name", "Unidentified food")),
