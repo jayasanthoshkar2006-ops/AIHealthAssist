@@ -269,15 +269,30 @@ export const LiveWorkoutPage: React.FC = () => {
     setModelLoading(true);
     try {
       if (!poseRef.current) {
-        const vision = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm');
-        poseRef.current = await PoseLandmarker.createFromOptions(vision, {
-          baseOptions: { modelAssetPath: POSE_MODEL_URL, delegate: 'GPU' },
+        const vision = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm');
+        try {
+          poseRef.current = await PoseLandmarker.createFromOptions(vision, {
+            baseOptions: { modelAssetPath: POSE_MODEL_URL, delegate: 'GPU' },
           runningMode: 'VIDEO',
           numPoses: 1,
           minPoseDetectionConfidence: 0.5,
           minPosePresenceConfidence: 0.5,
-          minTrackingConfidence: 0.5,
-        });
+            minTrackingConfidence: 0.5,
+          });
+        } catch (gpuError) {
+          console.warn('MediaPipe GPU initialization failed; retrying with CPU.', gpuError);
+          poseRef.current = await PoseLandmarker.createFromOptions(vision, {
+            baseOptions: { modelAssetPath: POSE_MODEL_URL, delegate: 'CPU' },
+            runningMode: 'VIDEO',
+            numPoses: 1,
+            minPoseDetectionConfidence: 0.5,
+            minPosePresenceConfidence: 0.5,
+            minTrackingConfidence: 0.5,
+          });
+        }
+      }
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('Camera access is not available in this browser or page context.');
       }
       streamRef.current = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
@@ -296,7 +311,14 @@ export const LiveWorkoutPage: React.FC = () => {
       speakFeedback(`Starting real AI ${selectedExercise} coaching. ${targetReps} reps target.`);
     } catch (err) {
       console.error(err);
-      setCameraError('Unable to start the real-time pose model. Check camera permission and internet connection for the first model download.');
+      const message = err instanceof Error ? err.message.toLowerCase() : '';
+      if (message.includes('permission') || message.includes('notallowed') || message.includes('denied')) {
+        setCameraError('Camera permission was blocked. Allow camera access for this site, then click Start Real Session again.');
+      } else if (message.includes('network') || message.includes('fetch') || message.includes('load') || message.includes('wasm') || message.includes('model')) {
+        setCameraError('The AI pose model could not be downloaded. Check your internet connection, refresh the page, and try again.');
+      } else {
+        setCameraError('Live AI could not start. Check camera permission and internet access, then try again.');
+      }
       streamRef.current?.getTracks().forEach(t => t.stop());
       streamRef.current = null;
     } finally {
