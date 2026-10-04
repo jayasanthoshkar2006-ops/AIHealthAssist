@@ -262,14 +262,16 @@ def chat_with_assistant(
                 if isinstance(item, dict) and item.get("category") == "workout":
                     saved_time = item.get("time")
                     if saved_time:
-                        res["response"] = (
-                            f"Done. I moved your workout to {_format_time(saved_time)}. "
-                            "Your Today's Plan has been updated."
-                        )
-                        if data.language != "ta" else (
-                            f"சரி. உங்கள் workout {_format_time(saved_time)}க்கு மாற்றப்பட்டுள்ளது. "
-                            "Today's Plan புதுப்பிக்கப்பட்டது."
-                        )
+                        if data.language != "ta":
+                            res["response"] = (
+                                f"Done. I moved your workout to {_format_time(saved_time)}. "
+                                "Your Today's Plan has been updated."
+                            )
+                        else:
+                            res["response"] = (
+                                f"சரி. உங்கள் workout {_format_time(saved_time)}க்கு மாற்றப்பட்டுள்ளது. "
+                                "Today's Plan புதுப்பிக்கப்பட்டது."
+                            )
                         break
 
     # Store tool/action metadata with the assistant message as well.
