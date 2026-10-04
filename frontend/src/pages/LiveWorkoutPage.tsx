@@ -48,7 +48,7 @@ const PROFESSION_PLANS: Record<string, string[]> = {
   'manual worker': ['Glute Bridge', 'Squat', 'Calf Raise', 'Side Plank', 'Shoulder Press', 'Reverse Lunge'],
 };
 
-const POSE_MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
+const POSE_MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task';
 
 function angle(a: Landmark, b: Landmark, c: Landmark) {
   const ab = { x: a.x - b.x, y: a.y - b.y };
@@ -154,6 +154,7 @@ export const LiveWorkoutPage: React.FC = () => {
   const repRef = useRef(0);
   const lastSpokenRef = useRef('');
   const lastFrameRef = useRef(-1);
+  const lastInferenceRef = useRef(0);
   const autoAdvanceRef = useRef(false);
 
   const [profile, setProfile] = useState<any>(null);
@@ -261,7 +262,9 @@ export const LiveWorkoutPage: React.FC = () => {
       return;
     }
     const timestamp = performance.now();
-    if (Math.floor(timestamp / 1000) !== lastFrameRef.current) {
+    // Run pose inference around 10 FPS. The old 1 FPS loop was too slow for accurate tracking and rep transitions.
+    if (timestamp - lastInferenceRef.current >= 100) {
+      lastInferenceRef.current = timestamp;
       lastFrameRef.current = Math.floor(timestamp / 1000);
       const result = poseRef.current.detectForVideo(video, timestamp);
       const points = result.landmarks?.[0];
@@ -318,7 +321,7 @@ export const LiveWorkoutPage: React.FC = () => {
     if (!poseRef.current) { setCameraError('AI model is still preparing. Please wait a moment and try again.'); return; }
     try {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error('camera unavailable');
-      streamRef.current = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }, audio: false });
+      streamRef.current = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, min: 24 }, facingMode: 'user' }, audio: false });
       if (!videoRef.current) throw new Error('camera view unavailable');
       videoRef.current.srcObject = streamRef.current; await videoRef.current.play();
       repRef.current = 0; stageRef.current = 'up'; lastSpokenRef.current = ''; autoAdvanceRef.current = false;
