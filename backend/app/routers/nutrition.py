@@ -1,11 +1,10 @@
 from datetime import date
 from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException
-from app.config import settings
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.domain_models import User, NutritionLog, UserProfile, EnvironmentResource, Goal
-from app.schemas.domain_schemas import FoodImageAnalyzeRequest, FoodAnalysisResponse, NutritionLogCreate
+from app.schemas.domain_schemas import NutritionLogCreate
 from app.routers.auth import get_current_user
 from app.ai.factory import get_ai_provider
 
@@ -48,39 +47,6 @@ def calculate_daily_calorie_target(profile: UserProfile, goals: list[Goal] | Non
     target = max(1200, min(4000, target))
     return int(round(target / 50) * 50), goal
 
-
-@router.post("/analyze-image", response_model=FoodAnalysisResponse)
-def analyze_food_image(data: FoodImageAnalyzeRequest):
-    if not data.image_base64 or len(data.image_base64) < 100:
-        raise HTTPException(status_code=400, detail="A real food image is required.")
-    if len(data.image_base64) > 12_000_000:
-        raise HTTPException(status_code=413, detail="Image is too large. Please use an image smaller than 8 MB.")
-    if not settings.GEMINI_API_KEY:
-        raise HTTPException(
-            status_code=503,
-            detail="Food vision AI is not configured on the server. Add GEMINI_API_KEY to the Render backend environment, then redeploy."
-        )
-
-    ai = get_ai_provider()
-    try:
-        res = ai.analyze_food_image(data.image_base64, data.meal_type or "Lunch", data.mime_type or "image/jpeg")
-    except Exception as exc:
-        raise HTTPException(
-            status_code=502,
-            detail="Food vision AI could not analyze this image. Please try a clearer photo or check the server vision configuration."
-        ) from exc
-
-    return FoodAnalysisResponse(
-        food_name=res["food_name"],
-        estimated_serving=res["estimated_serving"],
-        calories=res["calories"],
-        protein_g=res["protein_g"],
-        carbs_g=res["carbs_g"],
-        fat_g=res["fat_g"],
-        confidence_percentage=res["confidence_percentage"],
-        is_estimate=res["is_estimate"],
-        disclaimer=res["disclaimer"]
-    )
 
 @router.post("/meals")
 def create_meal_log(data: NutritionLogCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
