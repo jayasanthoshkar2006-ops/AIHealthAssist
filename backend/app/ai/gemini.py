@@ -101,8 +101,8 @@ Rules:
                 "parts": [
                     {"text": prompt},
                     {
-                        "inline_data": {
-                            "mime_type": mime_type,
+                        "inlineData": {
+                            "mimeType": mime_type,
                             "data": base64.b64encode(image_bytes).decode("utf-8")
                         }
                     }
@@ -115,7 +115,7 @@ Rules:
         }
 
         try:
-            response = requests.post(endpoint, params={"key": self.api_key}, json=payload, timeout=45)
+            response = requests.post(endpoint, headers={"x-goog-api-key": self.api_key, "Content-Type": "application/json"}, json=payload, timeout=45)
             if not response.ok:
                 raise RuntimeError(f"Gemini API HTTP {response.status_code}: {response.text[:1000]}")
 
