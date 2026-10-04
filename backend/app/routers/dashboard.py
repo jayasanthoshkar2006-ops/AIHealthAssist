@@ -710,6 +710,8 @@ def get_dashboard(
     return {
         "is_demo": False,
         "demo_notice": None,
+        "user_name": profile.name if profile and profile.name else current_user.email.split("@")[0],
+        "profession": profile.profession if profile and profile.profession else None,
         "profile": (
             {
                 "name": profile.name,
