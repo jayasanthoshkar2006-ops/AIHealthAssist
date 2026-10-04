@@ -43,7 +43,7 @@ def get_dashboard(
     # DEMO USER CHECK
     # ============================================================
 
-    is_demo_user = current_user.email == "demo@example.com"
+    is_demo_user = bool(current_user.is_demo)
 
     # ============================================================
     # USER PROFILE
@@ -506,6 +506,10 @@ def get_dashboard(
         # --------------------------------------------------------
 
         return {
+            "is_demo": True,
+            "demo_notice": "Demo Mode: This account contains sample data for demonstrating HealthAssist AI. It is not real health information.",
+            "user_name": demo_profile["name"],
+            "profession": demo_profile["profession"],
             "profile": demo_profile,
             "schedule": demo_schedule,
             "bmi": demo_bmi,
@@ -704,6 +708,8 @@ def get_dashboard(
     # ============================================================
 
     return {
+        "is_demo": False,
+        "demo_notice": None,
         "profile": (
             {
                 "name": profile.name,
