@@ -32,6 +32,9 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+      - name: Disable Jekyll processing
+        run: touch frontend/dist/.nojekyll
+
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
