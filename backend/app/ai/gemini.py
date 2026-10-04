@@ -1,7 +1,5 @@
 import json
-import base64
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 from typing import Dict, Any, List, Optional
 from app.config import settings
 from app.ai.provider import BaseAIProvider
@@ -10,8 +8,8 @@ from app.ai.local_heuristic import LocalHeuristicProvider
 class GeminiProvider(BaseAIProvider):
     def __init__(self, api_key: str):
         self.api_key = api_key
-        self.client = genai.Client(api_key=api_key)
-        self.model_name = 'gemini-3.8-flash'
+        genai.configure(api_key=api_key)
+        self.model = genai.GenerativeModel('gemini-1.5-flash')
         self.fallback = LocalHeuristicProvider()
 
     def analyze_lifestyle_resources(self, profile: Dict[str, Any], resources: Dict[str, Any]) -> Dict[str, Any]:
@@ -30,7 +28,7 @@ class GeminiProvider(BaseAIProvider):
             possible_conflicts (list of str),
             personalized_recommendations (list of str).
             """
-            response = self.client.models.generate_content(model=self.model_name, contents=prompt)
+            response = self.model.generate_content(prompt)
             # Clean markdown code block if present
             text = response.text.replace("```json", "").replace("```", "").strip()
             return json.loads(text)
@@ -52,7 +50,7 @@ class GeminiProvider(BaseAIProvider):
             ai_insights (str),
             recommendations (list of str).
             """
-            response = self.client.models.generate_content(model=self.model_name, contents=prompt)
+            response = self.model.generate_content(prompt)
             text = response.text.replace("```json", "").replace("```", "").strip()
             return json.loads(text)
         except Exception:
@@ -66,7 +64,7 @@ class GeminiProvider(BaseAIProvider):
             
             Return ONLY the updated JSON list of schedule objects.
             """
-            response = self.client.models.generate_content(model=self.model_name, contents=prompt)
+            response = self.model.generate_content(prompt)
             text = response.text.replace("```json", "").replace("```", "").strip()
             return json.loads(text)
         except Exception:
@@ -125,7 +123,7 @@ class GeminiProvider(BaseAIProvider):
             Provide a helpful, friendly response.
             Do NOT provide medical diagnosis.
             """
-            response = self.client.models.generate_content(model=self.model_name, contents=prompt)
+            response = self.model.generate_content(prompt)
             return {
                 "response": response.text,
                 "source_type": "GEMINI_AI",
