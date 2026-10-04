@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiRequest } from '../api/client';
 import { DisclaimerBanner } from '../components/common/DisclaimerBanner';
-import { Pill, Calendar, Plus, Clock, AlertCircle, Bell, BellOff } from 'lucide-react';
+import { Pill, Calendar, Plus, Clock, AlertCircle, Bell, BellOff, Pencil, X, Save } from 'lucide-react';
 import { notificationsEnabled, requestNotificationPermission, disableNotifications } from '../services/notificationService';
 
 export const RemindersPage: React.FC = () => {
@@ -14,6 +14,7 @@ export const RemindersPage: React.FC = () => {
   const [medName, setMedName] = useState('');
   const [dosage, setDosage] = useState('1 tablet');
   const [remTime, setRemTime] = useState('08:00');
+  const [editingMedId, setEditingMedId] = useState<number | null>(null);
 
   // Appointment Form
   const [appTitle, setAppTitle] = useState('');
@@ -56,13 +57,27 @@ export const RemindersPage: React.FC = () => {
   };
 
 
+  const startEditMedication = (m: any) => {
+    setEditingMedId(m.id);
+    setMedName(m.name || '');
+    setDosage(m.dosage || '1 tablet');
+    setRemTime(m.reminder_time || '08:00');
+  };
+
+  const cancelEditMedication = () => {
+    setEditingMedId(null);
+    setMedName('');
+    setDosage('1 tablet');
+    setRemTime('08:00');
+  };
+
   const handleAddMed = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!medName.trim()) return;
 
     try {
-      await apiRequest('/medications', {
-        method: 'POST',
+      await apiRequest(editingMedId ? `/medications/${editingMedId}` : '/medications', {
+        method: editingMedId ? 'PUT' : 'POST',
         body: JSON.stringify({
           name: medName,
           dosage,
@@ -70,7 +85,7 @@ export const RemindersPage: React.FC = () => {
           reminder_time: remTime
         })
       });
-      setMedName('');
+      cancelEditMedication();
       fetchData();
     } catch (err: any) {
       alert(err.message || 'Failed to add medication');
@@ -187,7 +202,17 @@ export const RemindersPage: React.FC = () => {
               type="submit"
               className="w-full py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-emerald-500 font-bold text-slate-950 text-xs shadow-glow flex items-center justify-center gap-1"
             >
-              <Plus className="w-4 h-4" /> Add Medication Reminder
+              {editingMedId ? <Save className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+              {editingMedId ? 'Save Medication Changes' : 'Add Medication Reminder'}
+            </button>
+            {editingMedId && (
+              <button
+                type="button"
+                onClick={cancelEditMedication}
+                className="w-full py-2 rounded-xl bg-slate-800 border border-slate-700 font-bold text-slate-300 text-xs flex items-center justify-center gap-1"
+              >
+                <X className="w-4 h-4" /> Cancel Edit
+              </button>
             </button>
           </form>
 
@@ -198,7 +223,18 @@ export const RemindersPage: React.FC = () => {
                   <p className="font-bold text-slate-200">{m.name}</p>
                   <p className="text-slate-400 text-[11px]">{m.dosage} • Daily</p>
                 </div>
-                <span className="font-mono text-sky-400 font-bold">{m.reminder_time}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-sky-400 font-bold">{m.reminder_time}</span>
+                  <button
+                    type="button"
+                    onClick={() => startEditMedication(m)}
+                    className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-400"
+                    title="Edit medication reminder"
+                    aria-label={`Edit ${m.name} reminder`}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
