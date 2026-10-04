@@ -14,7 +14,9 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     pin_code = Column(String(10), nullable=True)
     is_active = Column(Boolean, default=True)
-    # True only for the built-in sample/demo account. Never set this for normal users.\n    is_demo = Column(Boolean, default=False, nullable=False, index=True)\n    language = Column(String(10), default="en")  # 'en' or 'ta'
+    # True only for the built-in sample/demo account. Never set this for normal users.
+    is_demo = Column(Boolean, default=False, nullable=False, index=True)
+    language = Column(String(10), default="en")  # 'en' or 'ta'
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
