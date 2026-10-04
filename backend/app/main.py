@@ -25,6 +25,7 @@ from app.auth.security import get_password_hash
 # Create tables automatically for SQLite local fallback or Postgres
 Base.metadata.create_all(bind=engine)
 
+# Add the demo flag to existing SQLite databases.\nif settings.DATABASE_URL.startswith("sqlite"):\n    from sqlalchemy import inspect, text\n    if "is_demo" not in {c["name"] for c in inspect(engine).get_columns("users")}:\n        with engine.begin() as connection:\n            connection.execute(text("ALTER TABLE users ADD COLUMN is_demo BOOLEAN NOT NULL DEFAULT 0"))\n
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
@@ -77,7 +78,8 @@ def seed_demo_user():
             demo_user = domain_models.User(
                 email="demo@example.com",
                 hashed_password=get_password_hash("demo1234"),
-                language="en"
+                language="en",
+                is_demo=True
             )
             db.add(demo_user)
             db.commit()
