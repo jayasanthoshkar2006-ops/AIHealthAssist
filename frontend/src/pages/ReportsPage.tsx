@@ -2,28 +2,62 @@ import React, { useState } from 'react';
 import { DisclaimerBanner } from '../components/common/DisclaimerBanner';
 import { FileText, Download, Sparkles, CheckCircle2 } from 'lucide-react';
 
+const API_BASE_URL = 'https://aihealthassist-backend.onrender.com/api/v1';
+
 export const ReportsPage: React.FC = () => {
   const [downloading, setDownloading] = useState(false);
 
   const handleDownloadPDF = async () => {
     setDownloading(true);
+
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/v1/reports/wellness/generate', {
+
+      if (!token) {
+        throw new Error('Please sign in again before downloading the report.');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/reports/wellness/generate`, {
+        method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          Accept: 'application/pdf',
+          Authorization: `Bearer ${token}`,
+        },
       });
+
+      if (!response.ok) {
+        let message = `Unable to generate the PDF (HTTP ${response.status}).`;
+        try {
+          const errorData = await response.json();
+          if (errorData?.detail) message = errorData.detail;
+        } catch {
+          // The backend may return a non-JSON error response.
+        }
+        throw new Error(message);
+      }
+
       const blob = await response.blob();
+
+      if (!blob.size || blob.type !== 'application/pdf') {
+        throw new Error('The server did not return a valid PDF file.');
+      }
+
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `AI_Personal_Wellness_Report_${new Date().toISOString().split('T')[0]}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    } catch (err: any) {
-      alert('Failed to generate PDF report');
+      const link = document.createElement('a');
+      const today = new Date().toISOString().slice(0, 10);
+
+      link.href = url;
+      link.download = `AI_Personal_Wellness_Report_${today}.pdf`;
+      link.style.display = 'none';
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to generate PDF report.';
+      alert(message);
     } finally {
       setDownloading(false);
     }
