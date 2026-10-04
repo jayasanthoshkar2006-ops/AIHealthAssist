@@ -227,8 +227,20 @@ class LocalHeuristicProvider(BaseAIProvider):
         }
         is_greeting = msg_lower in {
             "hi", "hii", "hiii", "hello", "hey", "hey there",
-            "good morning", "good afternoon", "good evening"
+            "good morning", "good afternoon", "good evening",
+            "nice to meet you", "good to meet you",
+            "pleased to meet you", "glad to meet you"
         }
+        is_how_are_you = msg_lower in {
+            "how are you", "how are you doing", "how are things"
+        }
+        is_identity_question = msg_lower in {
+            "who are you", "what are you", "what can you do", "what do you do"
+        }
+        is_thanks = msg_lower in {
+            "thanks", "thank you", "thank you so much", "thanks a lot"
+        }
+        is_acknowledgement = msg_lower in {"ok", "okay", "sure", "alright", "all right"}
         is_negative_short = msg_lower in {
             "no", "nope", "nah", "not now", "nothing", "leave it", "forget it"
         }
@@ -290,12 +302,41 @@ class LocalHeuristicProvider(BaseAIProvider):
                 response = "பரவாயில்லை. இப்போது அதை விட்டுவிடலாம். பிறகு schedule, workout, உணவு, sleep அல்லது goals பற்றி கேட்கலாம்."
 
         elif is_greeting:
-            response = (
-                f"Hi! I’m ready to help with your {profession} lifestyle. "
-                "What would you like to work on today—your schedule, workout, food, sleep, or a health/lifestyle question?"
-            )
+            if msg_lower in {"nice to meet you", "good to meet you", "pleased to meet you", "glad to meet you"}:
+                response = (
+                    "Nice to meet you too! I’m HealthAssist AI. I can help you with your schedule, "
+                    "workouts, nutrition, sleep, and lifestyle goals."
+                )
+            else:
+                response = (
+                    f"Hi! I’m ready to help with your {profession} lifestyle. "
+                    "What would you like to work on today—your schedule, workout, food, sleep, or a health/lifestyle question?"
+                )
             if is_tamil:
                 response = "வணக்கம்! உங்கள் lifestyle-க்கு உதவ தயாராக இருக்கிறேன். இன்று schedule, workout, உணவு, sleep அல்லது health/lifestyle கேள்வி—எதைப் பற்றி உதவி வேண்டும்?"
+
+        elif is_how_are_you:
+            response = "I’m doing well and ready to help! What would you like to work on today?"
+            if is_tamil:
+                response = "நான் நன்றாக இருக்கிறேன், உதவ தயாராக இருக்கிறேன்! இன்று எதைப் பற்றி உதவி வேண்டும்?"
+
+        elif is_identity_question:
+            response = (
+                "I’m HealthAssist AI, your personal health and lifestyle assistant. "
+                "I can help with your schedule, workouts, nutrition, sleep, goals, and wellness questions."
+            )
+            if is_tamil:
+                response = "நான் HealthAssist AI, உங்கள் personal health மற்றும் lifestyle assistant. Schedule, workout, nutrition, sleep, goals மற்றும் wellness கேள்விகளில் உதவ முடியும்."
+
+        elif is_thanks:
+            response = "You’re welcome! I’m here whenever you need help."
+            if is_tamil:
+                response = "வரவேற்கிறேன்! தேவையான போது எப்போது வேண்டுமானாலும் கேளுங்கள்."
+
+        elif is_acknowledgement:
+            response = "Sure. What would you like to do next?"
+            if is_tamil:
+                response = "சரி. அடுத்து என்ன செய்ய விரும்புகிறீர்கள்?"
 
         elif is_move_workout:
             new_time = "19:00"
