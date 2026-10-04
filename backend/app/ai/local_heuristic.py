@@ -170,26 +170,65 @@ class LocalHeuristicProvider(BaseAIProvider):
     def analyze_sleep_patterns(self, sleep_logs: List[Dict[str, Any]]) -> Dict[str, Any]:
         if not sleep_logs:
             return {
-                "average_duration": 7.2,
-                "consistency_score": 80,
-                "patterns_identified": ["Regular sleep baseline."],
-                "recommendation": "Maintain consistency in sleep and wake times."
+                "average_duration": None,
+                "average_quality": None,
+                "consistency_score": None,
+                "patterns_identified": [],
+                "recommendation": "Log at least a few nights of sleep to see personalized patterns."
             }
 
-        durations = [log.get("duration_hours", 7.0) for log in sleep_logs]
+        durations = [float(log.get("duration_hours") or 0) for log in sleep_logs]
+        durations = [d for d in durations if d > 0]
+        if not durations:
+            return {
+                "average_duration": None,
+                "average_quality": None,
+                "consistency_score": None,
+                "patterns_identified": ["Sleep duration data is missing."],
+                "recommendation": "Enter a valid sleep duration for each night."
+            }
+
         avg_dur = round(sum(durations) / len(durations), 1)
-        
+        qualities = [float(log.get("quality_score") or 0) for log in sleep_logs]
+        qualities = [q for q in qualities if q > 0]
+        avg_quality = round(sum(qualities) / len(qualities), 1) if qualities else None
+
+        mean = sum(durations) / len(durations)
+        variance = sum((d - mean) ** 2 for d in durations) / len(durations)
+        duration_sd = math.sqrt(variance)
+        consistency_score = max(0, min(100, round(100 - duration_sd * 20)))
+
         patterns = []
-        if avg_dur < 6.5:
-            patterns.append("Average sleep duration is lower than recommended 7-8 hours.")
+        if avg_dur < 7:
+            patterns.append("Your average sleep duration is below 7 hours.")
+        elif avg_dur > 9:
+            patterns.append("Your average sleep duration is above 9 hours.")
         else:
-            patterns.append("Sleep duration meets target healthy range.")
-            
+            patterns.append("Your average sleep duration is within a typical 7-9 hour range.")
+
+        if avg_quality < 6 if avg_quality is not None else False:
+            patterns.append("Your average sleep quality rating is low.")
+        elif avg_quality is not None and avg_quality >= 8:
+            patterns.append("Your average sleep quality rating is good.")
+
+        if len(durations) >= 3:
+            if duration_sd <= 0.5:
+                patterns.append("Sleep duration is fairly consistent across recent nights.")
+            elif duration_sd >= 1.5:
+                patterns.append("Sleep duration varies considerably between recent nights.")
+
+        recommendation = "Keep a consistent sleep and wake routine and protect your wind-down time."
+        if avg_dur < 7:
+            recommendation = "Try to allow more time for sleep and keep a consistent bedtime and wake time."
+        elif avg_quality is not None and avg_quality < 6:
+            recommendation = "Review factors that may affect sleep quality, such as late screens, stress, caffeine, and an inconsistent routine."
+
         return {
             "average_duration": avg_dur,
-            "consistency_score": 85 if len(durations) > 3 else 70,
+            "average_quality": avg_quality,
+            "consistency_score": consistency_score,
             "patterns_identified": patterns,
-            "recommendation": "Avoid screen time 30 minutes before your target sleep time."
+            "recommendation": recommendation
         }
 
     def chat_response(self, message: str, context: Dict[str, Any], use_internet: bool = False, language: str = "en") -> Dict[str, Any]:
