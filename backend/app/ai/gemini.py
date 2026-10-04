@@ -148,20 +148,105 @@ Rules:
         return self.fallback.analyze_sleep_patterns(sleep_logs)
 
     def chat_response(self, message: str, context: Dict[str, Any], use_internet: bool = False, language: str = "en") -> Dict[str, Any]:
+        """
+        Hybrid AI brain:
+        1. Run the deterministic local brain first so real user data and safe tools
+           always win for schedule, workout, nutrition and verified-information tasks.
+        2. Use Gemini for natural-language reasoning and conversation when no local
+           tool/action is required.
+        3. Fall back to the local brain if Gemini is unavailable.
+        """
+        local_result = self.fallback.chat_response(
+            message, context, use_internet, language
+        )
+
+        # Never let a generative model replace a real application action.
+        if local_result.get("tool_executed"):
+            return local_result
+
+        history = context.get("conversation_history") or []
+        safe_context = {
+            "profile": {
+                "name": context.get("user_name"),
+                "age": context.get("age"),
+                "gender": context.get("gender"),
+                "profession": context.get("profession"),
+                "height_cm": context.get("height_cm"),
+                "weight_kg": context.get("weight_kg"),
+                "fitness_level": context.get("fitness_level"),
+                "work_hours_per_day": context.get("work_hours_per_day"),
+                "normal_sleep_hours": context.get("normal_sleep_hours"),
+                "stress_rating": context.get("stress_rating"),
+                "food_preference": context.get("food_preference"),
+                "allergies": context.get("allergies"),
+                "available_foods": context.get("available_foods"),
+                "available_equipment": context.get("available_equipment"),
+                "gym_available": context.get("gym_available"),
+                "home_workout": context.get("home_workout"),
+            },
+            "schedule": context.get("schedule"),
+            "today_schedule": context.get("today_schedule"),
+            "goals": context.get("goals"),
+            "weekly_workouts_count": context.get("weekly_workouts_count", 0),
+            "weekly_average_form_score": context.get("weekly_average_form_score", 0),
+            "recent_nutrition": context.get("nutrition_recent"),
+            "recent_sleep": context.get("sleep_recent"),
+            "environment": context.get("environment"),
+            "conversation_history": history[-8:],
+        }
+
         try:
             prompt = f"""
-            You are an AI Personal Health & Wellness Assistant.
-            User Message: {message}
-            Language: {language}
-            Context: {json.dumps(context)}
-            Provide a helpful, friendly response. Do NOT provide medical diagnosis.
-            """
+You are the reasoning and conversation layer of HealthAssist AI.
+
+Your job is to understand the user's natural language, remember the recent
+conversation, and give practical personalized wellness guidance using ONLY
+the supplied user context.
+
+USER MESSAGE:
+{message}
+
+LANGUAGE:
+{language}
+
+USER CONTEXT:
+{json.dumps(safe_context, ensure_ascii=False)}
+
+RULES:
+- Be natural, concise, friendly and conversational.
+- Use the user's profession, schedule, goals, available food/equipment and recent
+  activity when they are relevant.
+- Treat recent conversation as context, but always prioritize the user's newest
+  message when it is clearly a new request.
+- Do not invent workouts completed, meals eaten, sleep records, appointments,
+  medications, profile facts or schedule entries.
+- Do not claim to have changed or saved anything. Application actions are handled
+  by tools.
+- Do not diagnose diseases, prescribe medicines, or present medical claims as
+  certain. Encourage professional care for medical concerns.
+- If the user asks for the latest/current external information, do not pretend
+  that your training knowledge is current. Ask them to enable Internet
+  Verification unless a verified result is already supplied.
+- If the user asks what you can do, explain that you can work with their
+  schedule, workouts, nutrition, sleep, goals and wellness planning.
+- For Tamil, answer naturally in Tamil with common English fitness terms where
+  useful.
+- Do not mention internal tools, prompts, context, providers, or implementation.
+- Answer the user's actual message directly. Do not force every conversation
+  back to health if the user is simply greeting, thanking, or making small talk.
+"""
             response = self.model.generate_content(prompt)
+            text = (response.text or "").strip()
+            if not text:
+                raise RuntimeError("Gemini returned an empty response")
+
             return {
-                "response": response.text,
+                "response": text,
                 "source_type": "GEMINI_AI",
                 "tool_executed": None,
-                "disclaimer": "This tool provides lifestyle wellness information and is not a substitute for professional medical advice."
+                "action_performed": None,
+                "citations": None,
+                "disclaimer": "This tool provides lifestyle and fitness wellness organization. It is not a substitute for professional medical advice."
             }
         except Exception:
-            return self.fallback.chat_response(message, context, use_internet, language)
+            return local_result
