@@ -154,26 +154,17 @@ class LocalHeuristicProvider(BaseAIProvider):
             "disclaimer": "Predictions are performance benchmarks. Listen to your body and adjust intensity as needed."
         }
 
-    def analyze_food_image(self, image_base64: str, meal_type: str) -> Dict[str, Any]:
-        # Fast local heuristic recognition
-        sample_foods = [
-            {"food_name": "South Indian Thali (Rice, Dal, Sambar, Vegetables & Curd)", "calories": 480, "protein_g": 16, "carbs_g": 78, "fat_g": 11, "serving": "1 plate"},
-            {"food_name": "Oatmeal with Banana & Almonds", "calories": 320, "protein_g": 11, "carbs_g": 54, "fat_g": 7, "serving": "1 bowl"},
-            {"food_name": "Grilled Chicken Salad & Whole Grain Toast", "calories": 410, "protein_g": 34, "carbs_g": 28, "fat_g": 12, "serving": "1 portion"},
-            {"food_name": "Chapati with Paneer Butter Masala", "calories": 520, "protein_g": 18, "carbs_g": 62, "fat_g": 22, "serving": "2 chapatis + curry"}
-        ]
-        
-        choice = random.choice(sample_foods)
+    def analyze_food_image(self, image_base64: str, meal_type: str, mime_type: str = "image/jpeg") -> Dict[str, Any]:
         return {
-            "food_name": choice["food_name"],
-            "estimated_serving": choice["serving"],
-            "calories": choice["calories"],
-            "protein_g": choice["protein_g"],
-            "carbs_g": choice["carbs_g"],
-            "fat_g": choice["fat_g"],
-            "confidence_percentage": 88.5,
+            "food_name": "Food image needs manual confirmation",
+            "estimated_serving": "1 visible serving",
+            "calories": 0,
+            "protein_g": 0,
+            "carbs_g": 0,
+            "fat_g": 0,
+            "confidence_percentage": 0,
             "is_estimate": True,
-            "disclaimer": "Image nutrition analysis provides approximate visual estimates. You can modify quantities or food items."
+            "disclaimer": "Real image recognition is unavailable in offline mode. Configure the supported vision AI provider to identify this photo, or enter the food and nutrition values manually."
         }
 
     def analyze_sleep_patterns(self, sleep_logs: List[Dict[str, Any]]) -> Dict[str, Any]:
