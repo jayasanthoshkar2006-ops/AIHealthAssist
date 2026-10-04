@@ -200,8 +200,9 @@ class LocalHeuristicProvider(BaseAIProvider):
         action_performed = None
         citations = None
 
-        # IMPORTANT: check specific intents before generic "workout"/"schedule"
-        # so nutrition and schedule-change requests are not misclassified.
+        # IMPORTANT: current/official information must be detected BEFORE generic nutrition
+        # matching. Otherwise phrases such as "latest WHO nutrition guideline" get routed
+        # to the pre-workout food helper simply because they contain the word "nutrition".
         is_move_workout = (
             ("move" in msg_lower and "workout" in msg_lower)
             or ("reschedule" in msg_lower and "workout" in msg_lower)
@@ -209,6 +210,12 @@ class LocalHeuristicProvider(BaseAIProvider):
             or ("workout" in msg_lower and ("evening" in msg_lower or "morning" in msg_lower))
             or "மாற்று" in message
         )
+
+        is_current_guideline = (
+            ("latest" in msg_lower or "current" in msg_lower or "official" in msg_lower)
+            and any(term in msg_lower for term in ["who", "guideline", "nutrition", "health"])
+        )
+
         is_food_question = any(term in msg_lower for term in [
             "what should i eat", "what can i eat", "eat before", "eat after",
             "pre workout", "post workout", "before a workout", "after a workout",
@@ -226,14 +233,9 @@ class LocalHeuristicProvider(BaseAIProvider):
             and not is_move_workout
         ) or "இன்றைக்கு" in message
 
-        is_current_guideline = (
-            ("latest" in msg_lower or "current" in msg_lower or "official" in msg_lower)
-            and any(term in msg_lower for term in ["who", "guideline", "nutrition", "health"])
-        )
-
         if is_move_workout:
             new_time = "19:00"
-            if "6 pm" in msg_lower or "6:00 pm" in msg_lower or "6 pm" in msg_lower:
+            if "6 pm" in msg_lower or "6:00 pm" in msg_lower:
                 new_time = "18:00"
             elif "7 pm" in msg_lower or "7:00 pm" in msg_lower:
                 new_time = "19:00"
@@ -242,6 +244,25 @@ class LocalHeuristicProvider(BaseAIProvider):
                 response = "சரி. உங்கள் workout மாலை 7:00 மணிக்கு மாற்றப்பட்டுள்ளது."
             tool_executed = "update_schedule"
             action_performed = {"new_workout_time": new_time}
+
+        elif is_current_guideline:
+            if use_internet:
+                response = (
+                    "Yes — Internet Verification is ON, so this question should use the official WHO source, "
+                    "not your local nutrition helper. WHO's healthy-diet guidance emphasizes a varied diet with "
+                    "minimally processed foods, plenty of fruits and vegetables, adequate fibre, and limiting "
+                    "free sugars, saturated fat, trans fat, and excess salt. For the current official wording and "
+                    "any newer WHO publication, use the linked WHO source below."
+                )
+                tool_executed = "internet_verify"
+                citations = [{
+                    "source": "World Health Organization — Healthy Diet",
+                    "url": "https://www.who.int/news-room/fact-sheets/detail/healthy-diet",
+                    "date": str(date.today())
+                }]
+            else:
+                response = "Internet Verification is OFF. I cannot reliably claim the latest official WHO guidance from local data. Turn on Internet Verification and ask again so I can verify the current WHO guidance."
+                tool_executed = "internet_verification_required"
 
         elif is_food_question:
             profession = context.get("profession", "college student")
@@ -280,19 +301,6 @@ class LocalHeuristicProvider(BaseAIProvider):
             if is_tamil:
                 response = "இதுதான் இன்று உங்கள் schedule. Today's Plan பகுதியில் முழு அட்டவணையை பார்க்கலாம்."
             tool_executed = "get_today_schedule"
-
-        elif is_current_guideline:
-            if use_internet:
-                response = "I can verify the latest official WHO nutrition guidance when Internet Verification is enabled. I will use the official WHO source rather than relying on local data."
-                tool_executed = "internet_verify"
-                citations = [{
-                    "source": "World Health Organization (WHO)",
-                    "url": "https://www.who.int/",
-                    "date": str(date.today())
-                }]
-            else:
-                response = "Internet Verification is OFF. I cannot reliably claim the latest official WHO guideline from local data. Turn on Internet Verification and ask again so I can verify the current WHO guidance."
-            tool_executed = tool_executed or "internet_verification_required"
 
         elif any(term in msg_lower for term in ["hello", "hi", "healthy lifestyle", "want a healthy", "help me"]):
             profession = context.get("profession", "college student")
