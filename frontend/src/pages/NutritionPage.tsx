@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiRequest } from '../api/client';
 import { DisclaimerBanner } from '../components/common/DisclaimerBanner';
-import { Utensils, CheckCircle2, Sparkles, Plus, Calculator } from 'lucide-react';
+import { Utensils, CheckCircle2, Sparkles, Calculator } from 'lucide-react';
 
 export const NutritionPage: React.FC = () => {
   const [summary, setSummary] = useState<any>(null);
@@ -31,7 +31,7 @@ export const NutritionPage: React.FC = () => {
       .then((res) => {
         const data = res as { foods?: any[] };
         setRememberedFoods(data.foods || []);
-      }
+      })
       .catch((err) => console.error(err));
   };
 
@@ -43,8 +43,6 @@ export const NutritionPage: React.FC = () => {
     const name = foodName.trim();
     if (!name) return;
 
-    // User enters the nutrition values from a food label/reference.
-    // The app calculates macro calories and shows the result before saving.
     const macroCalories = protein * 4 + carbs * 4 + fat * 9;
     const estimatedCalories = calories > 0 ? calories : Math.round(macroCalories);
 
@@ -92,7 +90,6 @@ export const NutritionPage: React.FC = () => {
     <div className="space-y-6">
       <DisclaimerBanner />
 
-      {/* Header */}
       <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-2">
         <h2 className="font-extrabold text-lg text-slate-100 flex items-center gap-2">
           <Utensils className="w-5 h-5 text-emerald-400" /> Manual Food & Nutrition Analyzer
@@ -102,7 +99,6 @@ export const NutritionPage: React.FC = () => {
         </p>
       </div>
 
-      {/* Daily Macro Progress */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl"><p className="text-xs text-slate-400">Total Calories</p><p className="text-2xl font-extrabold text-slate-100 mt-1">{summary?.total_calories || 0} / {summary?.calorie_target || '—'} kcal</p></div>
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl"><p className="text-xs text-slate-400">Protein</p><p className="text-2xl font-extrabold text-emerald-400 mt-1">{summary?.total_protein_g || 0}g</p></div>
@@ -110,7 +106,6 @@ export const NutritionPage: React.FC = () => {
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl"><p className="text-xs text-slate-400">Fats</p><p className="text-2xl font-extrabold text-amber-400 mt-1">{summary?.total_fat_g || 0}g</p></div>
       </div>
 
-      {/* Remembered Foods */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-5 h-5 text-emerald-400" />
@@ -144,7 +139,6 @@ export const NutritionPage: React.FC = () => {
         )}
       </div>
 
-      {/* Manual Food Analyzer */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-5">
         <div className="flex items-center gap-2">
           <Calculator className="w-5 h-5 text-sky-400" />
@@ -197,14 +191,12 @@ export const NutritionPage: React.FC = () => {
         )}
       </div>
 
-      {/* Practical Food Suggestions */}
       {suggestions && (
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-emerald-400" />
             <h3 className="font-bold text-sm text-slate-100">Practical Pantry Food Suggestions ({suggestions.food_preference})</h3>
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {suggestions.suggestions.map((item: any, idx: number) => (
               <div key={idx} className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
