@@ -104,8 +104,9 @@ class GeminiProvider(BaseAIProvider):
                 "is_estimate": True,
                 "disclaimer": "Visual nutrition values are approximate. Portion size, ingredients and cooking method can change actual values."
             }
-        except Exception:
-            return self.fallback.analyze_food_image(image_base64, meal_type, mime_type)
+        except Exception as e:
+            # Never turn a real image request into a fake/local food result.
+            raise RuntimeError(f"Gemini food vision analysis failed: {e}") from e
 
     def analyze_sleep_patterns(self, sleep_logs: List[Dict[str, Any]]) -> Dict[str, Any]:
         return self.fallback.analyze_sleep_patterns(sleep_logs)
