@@ -81,24 +81,44 @@ app.include_router(dashboard.router, prefix=v1_prefix)
 
 @app.on_event("startup")
 def seed_demo_user():
-    """Seeds a demo account demo@example.com for instant testing/demoing."""
+    """Create or repair the built-in demo account so Instant Demo always works."""
     db = SessionLocal()
     try:
-        demo = db.query(domain_models.User).filter(domain_models.User.email == "demo@example.com").first()
+        demo = (
+            db.query(domain_models.User)
+            .filter(domain_models.User.email == "demo@example.com")
+            .first()
+        )
+
         if not demo:
-            demo_user = domain_models.User(
+            demo = domain_models.User(
                 email="demo@example.com",
                 hashed_password=get_password_hash("demo1234"),
                 language="en",
-                is_demo=True
+                is_demo=True,
             )
-            db.add(demo_user)
-            db.commit()
-            db.refresh(demo_user)
+            db.add(demo)
+            db.flush()
+        else:
+            # The demo account may already exist in a persistent Render database
+            # with an old password/hash. Always repair the demo credentials.
+            demo.hashed_password = get_password_hash("demo1234")
+            demo.language = "en"
+            demo.is_demo = True
+            demo.is_active = True
 
-            # Seed demo profile
+        db.commit()
+        db.refresh(demo)
+
+        # Seed demo profile if it does not already exist.
+        prof = (
+            db.query(domain_models.UserProfile)
+            .filter(domain_models.UserProfile.user_id == demo.id)
+            .first()
+        )
+        if not prof:
             prof = domain_models.UserProfile(
-                user_id=demo_user.id,
+                user_id=demo.id,
                 name="Hari",
                 age=24,
                 gender="Male",
@@ -114,21 +134,30 @@ def seed_demo_user():
                 available_equipment="Dumbbells, Yoga Mat",
                 fitness_level="Intermediate",
                 stress_rating=4,
-                preferred_language="en"
+                preferred_language="en",
             )
             db.add(prof)
 
-            # Seed demo schedule
+        # Seed demo schedule if it does not already exist.
+        sched = (
+            db.query(domain_models.UserSchedule)
+            .filter(domain_models.UserSchedule.user_id == demo.id)
+            .first()
+        )
+        if not sched:
             sched = domain_models.UserSchedule(
-                user_id=demo_user.id,
+                user_id=demo.id,
                 wake_time="06:30",
                 sleep_time="23:00",
                 work_start="09:00",
-                work_end="17:30"
+                work_end="17:30",
             )
             db.add(sched)
-            db.commit()
+
+        db.commit()
+        print("Demo account ready: demo@example.com / demo1234")
     except Exception as e:
+        db.rollback()
         print("Demo seed info:", e)
     finally:
         db.close()
