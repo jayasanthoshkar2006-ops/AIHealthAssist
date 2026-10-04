@@ -1,3 +1,4 @@
+import base64
 import json
 import google.generativeai as genai
 from typing import Dict, Any, List, Optional
@@ -9,7 +10,7 @@ class GeminiProvider(BaseAIProvider):
     def __init__(self, api_key: str):
         self.api_key = api_key
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        self.model = genai.GenerativeModel('gemini-2.5-flash-lite')
         self.fallback = LocalHeuristicProvider()
 
     def analyze_lifestyle_resources(self, profile: Dict[str, Any], resources: Dict[str, Any]) -> Dict[str, Any]:
@@ -75,24 +76,31 @@ class GeminiProvider(BaseAIProvider):
 
     def analyze_food_image(self, image_base64: str, meal_type: str, mime_type: str = "image/jpeg") -> Dict[str, Any]:
         try:
-            if "," in image_base64 and image_base64.startswith("data:"):
+            if not image_base64:
+                raise ValueError("Empty image data")
+            if image_base64.startswith("data:") and "," in image_base64:
                 image_base64 = image_base64.split(",", 1)[1]
+            image_bytes = base64.b64decode(image_base64, validate=True)
             prompt = f"""
             Analyze this food photograph for a wellness nutrition tracker.
             Meal type: {meal_type}.
-            Identify the visible food and estimate one visible serving.
+            Identify only the visible food and estimate one visible serving.
             Return ONLY valid JSON with:
             food_name (string), estimated_serving (string),
             calories (number), protein_g (number), carbs_g (number),
             fat_g (number), confidence_percentage (number).
-            Do not invent hidden ingredients. These are approximate estimates.
+            Do not invent hidden ingredients. Nutrition values are approximate.
             """
-            image_bytes = base64.b64decode(image_base64, validate=True)
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=[prompt, types.Part.from_bytes(data=image_bytes, mime_type=mime_type)]
-            )
-            text = response.text.replace("```json", "").replace("```", "").strip()
+            response = self.model.generate_content([
+                prompt,
+                {"mime_type": mime_type, "data": image_bytes}
+            ])
+            text = (response.text or "").strip()
+            if text.startswith("```"):
+                parts = text.splitlines()
+                if parts and parts[0].startswith("```"): parts = parts[1:]
+                if parts and parts[-1].strip().startswith("```"): parts = parts[:-1]
+                text = "\n".join(parts).strip()
             result = json.loads(text)
             return {
                 "food_name": str(result.get("food_name", "Unidentified food")),
@@ -106,7 +114,6 @@ class GeminiProvider(BaseAIProvider):
                 "disclaimer": "Visual nutrition values are approximate. Portion size, ingredients and cooking method can change actual values."
             }
         except Exception as e:
-            # Never turn a real image request into a fake/local food result.
             raise RuntimeError(f"Gemini food vision analysis failed: {e}") from e
 
     def analyze_sleep_patterns(self, sleep_logs: List[Dict[str, Any]]) -> Dict[str, Any]:
