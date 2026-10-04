@@ -29,12 +29,32 @@ import {
   Tooltip,
 } from 'recharts';
 
+const getTimeGreeting = (): string => {
+  const hour = new Date().getHours();
+
+  if (hour >= 5 && hour < 12) return 'Good morning';
+  if (hour >= 12 && hour < 17) return 'Good afternoon';
+  if (hour >= 17 && hour < 21) return 'Good evening';
+  return 'Good night';
+};
+
 export const DashboardPage: React.FC = () => {
   const [data, setData] = useState<any>(null);
+  const [timeGreeting, setTimeGreeting] = useState(getTimeGreeting);
   const [loading, setLoading] = useState(true);
   const { t } = useTranslation();
 
   const isDemo = data?.is_demo === true;
+
+  // Keep the dashboard greeting synced with the user's current local time.
+  useEffect(() => {
+    const updateGreeting = () => setTimeGreeting(getTimeGreeting());
+
+    updateGreeting();
+    const interval = window.setInterval(updateGreeting, 60 * 1000);
+
+    return () => window.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     apiRequest('/dashboard')
@@ -224,7 +244,7 @@ export const DashboardPage: React.FC = () => {
 
           <h2 className="text-2xl font-extrabold tracking-tight text-slate-100 mt-2">
 
-            {t('goodMorning')}{' '}
+            {timeGreeting}{' '}
 
             <span className="bg-gradient-to-r from-sky-400 to-emerald-400 bg-clip-text text-transparent">
               {data?.user_name || 'Friend'}
