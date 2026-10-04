@@ -208,6 +208,23 @@ def chat_with_assistant(
         },
     }
 
+    # Load a small same-user conversation window so the local brain can resolve
+    # follow-ups such as "move it", "no", and short conversational replies.
+    recent_messages = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.user_id == current_user.id)
+        .order_by(ChatMessage.created_at.desc())
+        .limit(10)
+        .all()
+    )
+    recent_messages.reverse()
+    conversation_history = [
+        {"role": item.role, "content": item.content}
+        for item in recent_messages
+        if item.role in ("user", "assistant")
+    ]
+    context["conversation_history"] = conversation_history
+
     # Save the user's message only after collecting the same-user context.
     user_msg = ChatMessage(
         user_id=current_user.id,
