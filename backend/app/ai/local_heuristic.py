@@ -193,59 +193,131 @@ class LocalHeuristicProvider(BaseAIProvider):
         }
 
     def chat_response(self, message: str, context: Dict[str, Any], use_internet: bool = False, language: str = "en") -> Dict[str, Any]:
-        msg_lower = message.lower()
-        is_tamil = language == "ta" or any(char in message for char in ["என்ன", "வணக்கம்", "இன்று", "எனக்கு", "எத்தனை"])
+        msg_lower = message.lower().strip()
+        is_tamil = language == "ta" or any(char in message for char in ["என்ன", "வணக்கம்", "இன்று", "எனக்கு", "எத்தனை", "சாப்பிட"])
 
-        # Tool execution identification
         tool_executed = None
         action_performed = None
+        citations = None
 
-        if "schedule" in msg_lower or "plan" in msg_lower or "இன்றைக்கு" in message:
-            response = "Here is your plan for today: 06:30 AM Wake Up & Stretch, 09:00 AM Work/Study, 01:00 PM Lunch, 06:30 PM AI Workout, 08:00 PM Dinner, 10:30 PM Journal, 11:00 PM Sleep."
-            if is_tamil:
-                response = "இன்றைய உங்கள் அட்டவணை: காலை 06:30 விழிப்பு, 09:00 வேலை/படிப்புகள், 01:00 மதிய உணவு, மாலை 06:30 உடற்பயிற்சி (Workout), இரவு 08:00 இரவு உணவு, 11:00 தூக்கம்."
-            tool_executed = "get_today_schedule"
+        # IMPORTANT: check specific intents before generic "workout"/"schedule"
+        # so nutrition and schedule-change requests are not misclassified.
+        is_move_workout = (
+            ("move" in msg_lower and "workout" in msg_lower)
+            or ("reschedule" in msg_lower and "workout" in msg_lower)
+            or ("change" in msg_lower and "workout" in msg_lower)
+            or ("workout" in msg_lower and ("evening" in msg_lower or "morning" in msg_lower))
+            or "மாற்று" in message
+        )
+        is_food_question = any(term in msg_lower for term in [
+            "what should i eat", "what can i eat", "eat before", "eat after",
+            "pre workout", "post workout", "before a workout", "after a workout",
+            "meal before", "meal after", "nutrition", "food suggestion"
+        ]) or any(term in message for term in ["சாப்பிடலாம்", "உணவு", "ஊட்டச்சத்து"])
 
-        elif "workout" in msg_lower or "exercise" in msg_lower or "வாரம்" in message:
-            workouts_cnt = context.get("weekly_workouts_count", 4)
-            response = f"You completed {workouts_cnt} workouts this week! Your average form score was 89%. Keep up the strong consistency!"
-            if is_tamil:
-                response = f"இந்த வாரத்தில் நீங்கள் {workouts_cnt} உடற்பயிற்சிகளை நிறைவு செய்துள்ளீர்கள்! உங்கள் சராசரி படிவ மதிப்பெண் 89%. தொடர்ந்து முயற்சியுங்கள்!"
-            tool_executed = "get_weekly_workouts"
+        is_weekly_workout_question = (
+            ("how many" in msg_lower and "workout" in msg_lower)
+            or ("workouts" in msg_lower and "week" in msg_lower)
+            or "வாரம்" in message
+        )
 
-        elif "move workout" in msg_lower or "evening" in msg_lower or "மாற்று" in message:
-            response = "I have updated your schedule for today! Your workout is moved to 07:00 PM."
+        is_today_schedule = (
+            ("schedule" in msg_lower or "plan" in msg_lower)
+            and not is_move_workout
+        ) or "இன்றைக்கு" in message
+
+        is_current_guideline = (
+            ("latest" in msg_lower or "current" in msg_lower or "official" in msg_lower)
+            and any(term in msg_lower for term in ["who", "guideline", "nutrition", "health"])
+        )
+
+        if is_move_workout:
+            new_time = "19:00"
+            if "6 pm" in msg_lower or "6:00 pm" in msg_lower or "6 pm" in msg_lower:
+                new_time = "18:00"
+            elif "7 pm" in msg_lower or "7:00 pm" in msg_lower:
+                new_time = "19:00"
+            response = f"Done. I moved your workout to {new_time[:2]}:{new_time[3:]}." if new_time != "19:00" else "Done. I moved your workout to 7:00 PM."
             if is_tamil:
-                response = "உங்கள் இன்றைய அட்டவணையை மாற்றியுள்ளேன்! உடற்பயிற்சி மாலை 07:00 மணிக்கு மாற்றப்பட்டது."
+                response = "சரி. உங்கள் workout மாலை 7:00 மணிக்கு மாற்றப்பட்டுள்ளது."
             tool_executed = "update_schedule"
-            action_performed = {"new_workout_time": "19:00"}
+            action_performed = {"new_workout_time": new_time}
 
-        elif "food" in msg_lower or "eat" in msg_lower or "சாப்பிடலாம்" in message:
-            response = "Based on your available kitchen items, a balanced choice today is Lentil Dal with Whole Wheat Roti / Rice, a side of fresh Curd, and a Banana."
+        elif is_food_question:
+            profession = context.get("profession", "college student")
+            foods = context.get("available_foods") or ["banana", "milk", "eggs", "oats", "rice"]
+            food_text = ", ".join(map(str, foods[:6]))
+            response = (
+                f"For a pre-workout meal, keep it light and easy to digest. "
+                f"For you as a {profession}, try a banana with milk, or oats with fruit 60–90 minutes before training. "
+                f"If you need more protein, add an egg or another suitable protein source. "
+                f"Use foods you already have available: {food_text}. Avoid a very heavy or oily meal immediately before exercise."
+            )
             if is_tamil:
-                response = "உங்கள் சமையலறையில் உள்ள பொருட்களின் அடிப்படையில்: பருப்பு குழம்பு, சாதம்/ரொட்டி, தயிர் மற்றும் ஒரு வாழைப்பழம் சிறந்த உணவுத் தேர்வாகும்."
+                response = "Workoutக்கு 60–90 நிமிடங்களுக்கு முன் லேசான, எளிதில் ஜீரணமாகும் உணவை எடுத்துக்கொள்ளுங்கள். வாழைப்பழம் + பால் அல்லது oats + பழம் நல்ல தேர்வு. கூடுதல் protein வேண்டுமெனில் முட்டை போன்ற protein உணவை சேர்க்கலாம்."
             tool_executed = "get_food_suggestion"
 
-        else:
-            response = "I am your AI Personal Health & Wellness Assistant. I analyze your profession, schedule, environment, workouts, nutrition, and sleep to generate personalized guidance."
+        elif is_weekly_workout_question:
+            workouts_cnt = context.get("weekly_workouts_count", 0)
+            response = f"You completed {workouts_cnt} workouts this week. Keep up the consistency!"
             if is_tamil:
-                response = "நான் உங்களின் AI தனிப்பட்ட உடல்நல மற்றும் வாழ்க்கை முறை உதவியாளர். உங்கள் வேலை, நேர அட்டவணை, உணவுகள் மற்றும் உடற்பயிற்சிகளை பகுப்பாய்வு செய்து உதவுகிறேன்."
+                response = f"இந்த வாரத்தில் நீங்கள் {workouts_cnt} workout-களை முடித்துள்ளீர்கள். தொடர்ந்து செய்யுங்கள்!"
+            tool_executed = "get_weekly_workouts"
 
-        citations = None
-        if use_internet:
-            citations = [
-                {
-                    "source": "World Health Organization (WHO) - Physical Activity Guidelines",
-                    "url": "https://www.who.int/news-room/fact-sheets/detail/physical-activity",
-                    "date": "2024"
-                }
-            ]
+        elif is_today_schedule:
+            schedule = context.get("today_schedule") or []
+            if schedule:
+                items = []
+                for item in schedule:
+                    if isinstance(item, dict):
+                        t = item.get("time", "")
+                        a = item.get("activity", "")
+                        if t and a:
+                            items.append(f"{t} {a}")
+                response = "Here is your plan for today: " + ", ".join(items) if items else "Here is your plan for today: check Today's Plan for the full timeline."
+            else:
+                response = "I don't have a saved schedule for today yet. Please open Today's Plan to generate or update your schedule."
+            if is_tamil:
+                response = "இதுதான் இன்று உங்கள் schedule. Today's Plan பகுதியில் முழு அட்டவணையை பார்க்கலாம்."
+            tool_executed = "get_today_schedule"
+
+        elif is_current_guideline:
+            if use_internet:
+                response = "I can verify the latest official WHO nutrition guidance when Internet Verification is enabled. I will use the official WHO source rather than relying on local data."
+                tool_executed = "internet_verify"
+                citations = [{
+                    "source": "World Health Organization (WHO)",
+                    "url": "https://www.who.int/",
+                    "date": str(date.today())
+                }]
+            else:
+                response = "Internet Verification is OFF. I cannot reliably claim the latest official WHO guideline from local data. Turn on Internet Verification and ask again so I can verify the current WHO guidance."
+            tool_executed = tool_executed or "internet_verification_required"
+
+        elif any(term in msg_lower for term in ["hello", "hi", "healthy lifestyle", "want a healthy", "help me"]):
+            profession = context.get("profession", "college student")
+            response = (
+                f"Absolutely. For your {profession} lifestyle, I can help organize sleep, meals, workouts and study/work breaks. "
+                "A good starting point is regular sleep, balanced meals with enough protein and vegetables, hydration, "
+                "and consistent moderate exercise. Tell me your main goal—fitness, weight management, muscle gain, or better sleep—and I can tailor the plan."
+            )
+            if is_tamil:
+                response = "நிச்சயமாக. உங்கள் lifestyle-க்கு sleep, meals, workout மற்றும் study/work breaks ஆகியவற்றை திட்டமிட உதவுகிறேன். உங்கள் முக்கிய goal என்ன—fitness, weight management, muscle gain அல்லது better sleep?"
+        
+        else:
+            response = (
+                "I can help with your daily schedule, workouts, nutrition, sleep and lifestyle goals. "
+                "Ask me a specific question such as 'What should I eat before a workout?' or 'How many workouts did I complete this week?'"
+            )
+            if is_tamil:
+                response = "உங்கள் schedule, workout, nutrition, sleep மற்றும் lifestyle goals பற்றி உதவ முடியும். ஒரு குறிப்பிட்ட கேள்வியை கேளுங்கள்."
 
         return {
             "response": response,
-            "source_type": "INTERNET_VERIFIED" if use_internet else "LOCAL_DATA",
+            "source_type": "INTERNET_VERIFIED" if use_internet and is_current_guideline else "LOCAL_DATA",
             "tool_executed": tool_executed,
             "action_performed": action_performed,
             "citations": citations,
             "disclaimer": "This tool provides lifestyle and fitness wellness organization. It is not a substitute for professional medical advice."
         }
+
