@@ -3,12 +3,50 @@ from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models.domain_models import User, NutritionLog, UserProfile, EnvironmentResource
+from app.models.domain_models import User, NutritionLog, UserProfile, EnvironmentResource, Goal
 from app.schemas.domain_schemas import FoodImageAnalyzeRequest, FoodAnalysisResponse, NutritionLogCreate
 from app.routers.auth import get_current_user
 from app.ai.factory import get_ai_provider
 
 router = APIRouter(prefix="/nutrition", tags=["Nutrition AI & Meal Tracking"])
+
+def calculate_daily_calorie_target(profile: UserProfile, goals: list[Goal] | None = None):
+    """Estimate a daily calorie target from the user's saved profile and goals."""
+    if not profile or not profile.age or not profile.height or not profile.weight:
+        return None, "Complete age, height and weight in your profile to calculate a personalized target."
+
+    gender = (profile.gender or "").strip().lower()
+    if gender in {"male", "m", "man"}:
+        bmr = (10 * profile.weight) + (6.25 * profile.height) - (5 * profile.age) + 5
+    elif gender in {"female", "f", "woman"}:
+        bmr = (10 * profile.weight) + (6.25 * profile.height) - (5 * profile.age) - 161
+    else:
+        return None, "Add sex/gender in your profile to calculate a personalized calorie target."
+
+    profession = (profile.profession or "").lower()
+    if any(k in profession for k in ["athlete", "player", "sport", "trainer", "farmer", "labor", "construction"]):
+        activity_factor = 1.725
+    elif any(k in profession for k in ["nurse", "doctor", "teacher", "student", "retail", "sales"]):
+        activity_factor = 1.55
+    elif any(k in profession for k in ["office", "software", "developer", "computer", "desk", "accountant"]):
+        activity_factor = 1.375
+    else:
+        activity_factor = 1.375 if (profile.work_hours_per_day or 8) <= 8 else 1.2
+
+    target = bmr * activity_factor
+    goal_text = " ".join((g.title or "") for g in (goals or [])).lower()
+    if any(k in goal_text for k in ["gain", "muscle", "weight gain", "bulk"]):
+        target += 250
+        goal = "gain"
+    elif any(k in goal_text for k in ["lose", "fat loss", "weight loss", "cut"]):
+        target -= 250
+        goal = "lose"
+    else:
+        goal = "maintain"
+
+    target = max(1200, min(4000, target))
+    return int(round(target / 50) * 50), goal
+
 
 @router.post("/analyze-image", response_model=FoodAnalysisResponse)
 def analyze_food_image(data: FoodImageAnalyzeRequest):
@@ -55,12 +93,20 @@ def get_nutrition_summary(current_user: User = Depends(get_current_user), db: Se
     total_c = sum(l.carbs_g for l in logs)
     total_f = sum(l.fat_g for l in logs)
 
+    profile = db.query(UserProfile).filter(UserProfile.user_id == current_user.id).first()
+    goals = db.query(Goal).filter(Goal.user_id == current_user.id).all()
+    calorie_target, target_goal = calculate_daily_calorie_target(profile, goals)
+
     return {
         "date": str(date.today()),
         "total_calories": total_cal,
         "total_protein_g": total_p,
         "total_carbs_g": total_c,
         "total_fat_g": total_f,
+        "calorie_target": calorie_target,
+        "calorie_target_goal": target_goal,
+        "calorie_target_source": "personalized_profile" if calorie_target else "profile_incomplete",
+        "calorie_target_message": None if calorie_target else "Complete your age, sex, height and weight in your profile.",
         "meal_count": len(logs),
         "meals": [
             {
