@@ -56,10 +56,34 @@ export const DashboardPage: React.FC = () => {
     );
   }
 
-  const metrics = data?.metrics || {};
-  const performance = data?.daily_performance || {};
-  const components = performance?.components || {};
-  const dataStatus = data?.data_status || {};
+  // The dashboard API returns a normalized payload with today's values
+  // under "today". Keep the UI mapped to that contract so real users
+  // don't incorrectly see "No data" when records/profile exist.
+  const today = data?.today || {};
+  const metrics = {
+    workouts_completed: today.workout_count ?? 0,
+    avg_form_score: today.average_form ?? 0,
+    today_calories: today.calories_consumed ?? 0,
+    today_protein_g: today.protein_consumed ?? 0,
+    sleep_duration_hours: today.sleep_hours ?? 0,
+    sleep_quality_score: today.sleep_quality ?? 0,
+    streak_days: data?.streak?.current ?? 0,
+    habits_total: data?.habits?.total ?? 0,
+    habits_completed: data?.habits?.completed ?? 0,
+  };
+
+  const components = {
+    workout: metrics.workouts_completed > 0 ? Math.min(100, metrics.avg_form_score || 0) : null,
+    nutrition: metrics.today_calories > 0 ? 100 : null,
+    sleep: metrics.sleep_duration_hours > 0 ? Math.min(100, Math.round((metrics.sleep_duration_hours / 8) * 100)) : null,
+    habits: data?.habits?.completion_percentage ?? null,
+  };
+
+  const hasWorkoutData = isDemo || metrics.workouts_completed > 0;
+  const hasNutritionData = isDemo || metrics.today_calories > 0;
+  const hasSleepData = isDemo || metrics.sleep_duration_hours > 0;
+  const hasHabitData = isDemo || (data?.habits?.total ?? 0) > 0;
+  const hasPerformanceData = isDemo || hasWorkoutData || hasNutritionData || hasSleepData || hasHabitData;
 
   /*
    * DEMO MODE
@@ -78,21 +102,6 @@ export const DashboardPage: React.FC = () => {
    * Demo users always display the complete demo dashboard.
    * Normal users only display information that actually exists.
    */
-  const hasWorkoutData =
-    isDemo || dataStatus.has_workout_data === true;
-
-  const hasNutritionData =
-    isDemo || dataStatus.has_nutrition_data === true;
-
-  const hasSleepData =
-    isDemo || dataStatus.has_sleep_data === true;
-
-  const hasHabitData =
-    isDemo || dataStatus.has_habit_data === true;
-
-  const hasPerformanceData =
-    isDemo || performance.has_data === true;
-
   const schedule = data?.schedule;
   const profile = data?.profile;
 
@@ -206,7 +215,7 @@ export const DashboardPage: React.FC = () => {
               <span className="text-xs text-slate-400">
                 • Profession:{' '}
                 <strong className="text-slate-200">
-                  {data.profession}
+                  {data.profession || profile?.profession}
                 </strong>
               </span>
             )}
@@ -279,7 +288,10 @@ export const DashboardPage: React.FC = () => {
 
           {hasPerformanceData ? (
             <div className="text-3xl font-extrabold text-sky-400">
-              {performance.score ?? 95}%
+              {isDemo ? 95 : Math.round(
+                ((components.workout ?? 0) + (components.nutrition ?? 0) + (components.sleep ?? 0) + (components.habits ?? 0)) /
+                [components.workout, components.nutrition, components.sleep, components.habits].filter((v) => v != null).length
+              )}%
             </div>
           ) : (
             <div className="text-sm font-semibold text-slate-400">
@@ -449,8 +461,8 @@ export const DashboardPage: React.FC = () => {
             <ProfileValue
               title="Height"
               value={
-                profile.height_cm != null
-                  ? `${profile.height_cm} cm`
+                profile.height != null
+                  ? `${profile.height} cm`
                   : 'No data'
               }
             />
@@ -458,8 +470,8 @@ export const DashboardPage: React.FC = () => {
             <ProfileValue
               title="Weight"
               value={
-                profile.weight_kg != null
-                  ? `${profile.weight_kg} kg`
+                profile.weight != null
+                  ? `${profile.weight} kg`
                   : 'No data'
               }
             />
@@ -467,8 +479,8 @@ export const DashboardPage: React.FC = () => {
             <ProfileValue
               title="BMI"
               value={
-                profile.bmi != null
-                  ? `${profile.bmi}`
+                data?.bmi != null
+                  ? `${data.bmi}`
                   : 'No data'
               }
             />
