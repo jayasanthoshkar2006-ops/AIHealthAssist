@@ -7,6 +7,7 @@ export const NutritionPage: React.FC = () => {
   const [summary, setSummary] = useState<any>(null);
   const [suggestions, setSuggestions] = useState<any>(null);
   const [foodAnalysis, setFoodAnalysis] = useState<any>(null);
+  const [rememberedFoods, setRememberedFoods] = useState<any[]>([]);
 
   // Manual food analyzer — no camera, image upload, or vision AI.
   const [mealType, setMealType] = useState('Lunch');
@@ -24,6 +25,10 @@ export const NutritionPage: React.FC = () => {
 
     apiRequest('/nutrition/suggestions')
       .then((res) => setSuggestions(res))
+      .catch((err) => console.error(err));
+
+    apiRequest('/nutrition/remembered-foods')
+      .then((res) => setRememberedFoods(res.foods || []))
       .catch((err) => console.error(err));
   };
 
@@ -100,6 +105,40 @@ export const NutritionPage: React.FC = () => {
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl"><p className="text-xs text-slate-400">Protein</p><p className="text-2xl font-extrabold text-emerald-400 mt-1">{summary?.total_protein_g || 0}g</p></div>
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl"><p className="text-xs text-slate-400">Carbohydrates</p><p className="text-2xl font-extrabold text-sky-400 mt-1">{summary?.total_carbs_g || 0}g</p></div>
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl"><p className="text-xs text-slate-400">Fats</p><p className="text-2xl font-extrabold text-amber-400 mt-1">{summary?.total_fat_g || 0}g</p></div>
+      </div>
+
+      {/* Remembered Foods */}
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+          <div>
+            <h3 className="font-bold text-sm text-slate-100">Remembered Foods</h3>
+            <p className="text-xs text-slate-400 mt-1">Foods you previously saved are remembered for your account. Select one to reuse its nutrition values.</p>
+          </div>
+        </div>
+        {rememberedFoods.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {rememberedFoods.map((food) => (
+              <button key={food.food_key} type="button" onClick={() => {
+                setFoodName(food.food_name);
+                setPortion(food.portion || '1 serving');
+                setCalories(Number(food.calories || 0));
+                setProtein(Number(food.protein_g || 0));
+                setCarbs(Number(food.carbs_g || 0));
+                setFat(Number(food.fat_g || 0));
+                setFoodAnalysis(null);
+              }} className="text-left p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:border-emerald-500/40 transition">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-bold text-slate-100 text-sm">{food.food_name}</span>
+                  <span className="text-[10px] text-emerald-400 font-semibold">REUSE</span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">{food.portion} · {food.calories} kcal · {food.protein_g}g protein</p>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500">No remembered foods yet. Save a manual meal and it will appear here next time.</p>
+        )}
       </div>
 
       {/* Manual Food Analyzer */}
