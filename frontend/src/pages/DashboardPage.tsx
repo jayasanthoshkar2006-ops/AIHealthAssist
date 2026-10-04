@@ -171,7 +171,7 @@ export const DashboardPage: React.FC = () => {
   return (
     <div className="space-y-6">
 
-      <DisclaimerBanner />
+      <DisclaimerBanner />\n\n      {isDemo && (\n        <div className="rounded-2xl border border-sky-500/30 bg-sky-500/10 px-4 py-3">\n          <p className="text-sm font-semibold text-sky-300">Demo Mode</p>\n          <p className="text-xs text-slate-300 mt-1">\n            {data?.demo_notice || "This account contains sample data for demonstrating HealthAssist AI. It is not real health information."}\n          </p>\n        </div>\n      )}
 
       {/* =====================================================
           HEADER
@@ -189,7 +189,7 @@ export const DashboardPage: React.FC = () => {
 
             {isDemo && (
               <span className="text-xs font-semibold text-sky-400 bg-sky-500/10 px-2.5 py-1 rounded-full border border-sky-500/20">
-                Demo Mode
+                Demo Mode · Sample Data
               </span>
             )}
 
