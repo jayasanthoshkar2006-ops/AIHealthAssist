@@ -107,7 +107,7 @@ const ProtectedLayout: React.FC = () => {
               } catch {
                 alert('Unable to verify PIN. Please try again.');
               }
-            }
+            }}
             className="w-full py-3 rounded-xl bg-gradient-to-r from-sky-500 to-emerald-500 font-bold text-slate-950 text-xs shadow-glow"
           >
             Unlock Application
