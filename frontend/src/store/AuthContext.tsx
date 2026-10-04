@@ -23,7 +23,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userEmail, setUserEmail] = useState<string | null>(localStorage.getItem('userEmail'));
   const [hasProfile, setHasProfileState] = useState<boolean>(localStorage.getItem('hasProfile') === 'true');
   const [language, setLanguageState] = useState<string>(localStorage.getItem('language') || 'en');
-  const [isLocked, setIsLocked] = useState<boolean>(false);
+  const [isLocked, setIsLocked] = useState<boolean>(() => Boolean(
+    localStorage.getItem('token') && localStorage.getItem('appLockEnabled') === 'true'
+  ));
   
   const { i18n } = useTranslation();
 
@@ -63,7 +65,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setHasProfileState(status);
   };
 
-  const lockApp = () => setIsLocked(true);
+  const lockApp = () => {
+    if (localStorage.getItem('appLockEnabled') === 'true') setIsLocked(true);
+  };
   const unlockApp = () => setIsLocked(false);
 
   return (
