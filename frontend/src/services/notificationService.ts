@@ -18,15 +18,17 @@ export function disableNotifications() {
   localStorage.removeItem(ENABLED_KEY);
 }
 
-export function sendHealthNotification(title: string, body: string, tag: string) {
+export function sendHealthNotification(title: string, body: string, tag: string, dedupe = true) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   const today = new Date().toISOString().slice(0, 10);
   const key = `${today}:${tag}`;
   const sent = JSON.parse(localStorage.getItem(SENT_KEY) || '{}') as Record<string, boolean>;
-  if (sent[key]) return;
+  if (dedupe && sent[key]) return;
   new Notification(title, { body, tag: `healthassist-${tag}` });
-  sent[key] = true;
-  localStorage.setItem(SENT_KEY, JSON.stringify(sent));
+  if (dedupe) {
+    sent[key] = true;
+    localStorage.setItem(SENT_KEY, JSON.stringify(sent));
+  }
 }
 
 function timeMatchesNow(value: string, windowMinutes = 1): boolean {
@@ -41,6 +43,43 @@ function timeMatchesNow(value: string, windowMinutes = 1): boolean {
 
 export async function checkHealthReminders() {
   if (!notificationsEnabled() || Notification.permission !== 'granted') return;
+
+  try {
+    const plan = await apiRequest<any>('/daily-plan');
+    for (const item of plan?.timeline || []) {
+      if (item?.time && item?.activity && timeMatchesNow(item.time)) {
+        sendHealthNotification(
+          `⏰ HealthAssist AI · ${item.category || 'Daily Plan'}`,
+          item.activity,
+          `plan-${item.time}-${item.activity}`,
+        );
+      }
+    }
+  } catch {}
+
+  try {
+    const dashboard = await apiRequest<any>('/dashboard');
+    const today = dashboard?.today || {};
+    const hour = new Date().getHours();
+    if ((today.workout_count ?? 0) === 0 && hour >= 18 && hour <= 20) {
+      sendHealthNotification('🏋️ HealthAssist AI · Workout', 'You have not recorded a workout today.', 'workout-daily');
+    }
+    if ((today.calories_consumed ?? 0) === 0 && hour >= 12) {
+      sendHealthNotification('🥗 HealthAssist AI · Nutrition', 'No nutrition activity is recorded today.', 'nutrition-daily');
+    }
+    if ((today.sleep_hours ?? 0) === 0 && hour >= 9) {
+      sendHealthNotification('😴 HealthAssist AI · Sleep', 'Record your sleep to keep your wellness trends updated.', 'sleep-daily');
+    }
+  } catch {}
+
+  try {
+    const goals = await apiRequest<any>('/goals');
+    for (const streak of goals?.streaks || []) {
+      if ((streak.current_streak ?? 0) > 0) {
+        sendHealthNotification('🎯 HealthAssist AI · Goal', `${streak.category}: ${streak.current_streak} day streak.`, `streak-${streak.category}`);
+      }
+    }
+  } catch {}
 
   try {
     const medications = await apiRequest<any[]>('/medications');
