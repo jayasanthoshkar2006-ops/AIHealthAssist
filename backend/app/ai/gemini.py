@@ -73,8 +73,39 @@ class GeminiProvider(BaseAIProvider):
     def predict_performance(self, exercise_name: str, history: List[Dict[str, Any]]) -> Dict[str, Any]:
         return self.fallback.predict_performance(exercise_name, history)
 
-    def analyze_food_image(self, image_base64: str, meal_type: str) -> Dict[str, Any]:
-        return self.fallback.analyze_food_image(image_base64, meal_type)
+    def analyze_food_image(self, image_base64: str, meal_type: str, mime_type: str = "image/jpeg") -> Dict[str, Any]:
+        try:
+            if "," in image_base64 and image_base64.startswith("data:"):
+                image_base64 = image_base64.split(",", 1)[1]
+            prompt = f"""
+            Analyze this food photograph for a wellness nutrition tracker.
+            Meal type: {meal_type}.
+            Identify the visible food and estimate one visible serving.
+            Return ONLY valid JSON with:
+            food_name (string), estimated_serving (string),
+            calories (number), protein_g (number), carbs_g (number),
+            fat_g (number), confidence_percentage (number).
+            Do not invent hidden ingredients. These are approximate estimates.
+            """
+            response = self.model.generate_content([
+                prompt,
+                {"mime_type": mime_type, "data": image_base64}
+            ])
+            text = response.text.replace("\`\`\`json", "").replace("\`\`\`", "").strip()
+            result = json.loads(text)
+            return {
+                "food_name": str(result.get("food_name", "Unidentified food")),
+                "estimated_serving": str(result.get("estimated_serving", "1 visible serving")),
+                "calories": float(result.get("calories", 0)),
+                "protein_g": float(result.get("protein_g", 0)),
+                "carbs_g": float(result.get("carbs_g", 0)),
+                "fat_g": float(result.get("fat_g", 0)),
+                "confidence_percentage": float(result.get("confidence_percentage", 50)),
+                "is_estimate": True,
+                "disclaimer": "Visual nutrition values are approximate. Portion size, ingredients and cooking method can change actual values."
+            }
+        except Exception:
+            return self.fallback.analyze_food_image(image_base64, meal_type, mime_type)
 
     def analyze_sleep_patterns(self, sleep_logs: List[Dict[str, Any]]) -> Dict[str, Any]:
         return self.fallback.analyze_sleep_patterns(sleep_logs)
