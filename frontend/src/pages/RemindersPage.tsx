@@ -42,8 +42,7 @@ export const RemindersPage: React.FC = () => {
     const permission = await requestNotificationPermission();
     if (permission === 'granted') {
       setNotificationsOn(true);
-      setNotificationMessage('Notifications enabled. Keep HealthAssist AI open for scheduled reminders.');
-      new Notification('HealthAssist AI', { body: 'Notifications are working correctly.' });
+      setNotificationMessage('Notifications enabled. Scheduled reminders are active.');
     } else {
       setNotificationsOn(false);
       setNotificationMessage('Notification permission was not granted. Allow notifications in your browser settings.');
@@ -134,7 +133,7 @@ export const RemindersPage: React.FC = () => {
           onClick={notificationsOn ? turnOffNotifications : enableNotifications}
           className={`px-4 py-2.5 rounded-xl font-bold text-xs ${notificationsOn ? 'bg-slate-800 text-slate-200 border border-slate-700' : 'bg-gradient-to-r from-sky-500 to-emerald-500 text-slate-950'}`}
         >
-          {notificationsOn ? 'Disable Notifications' : 'Enable & Test Notifications'}
+          {notificationsOn ? 'Disable Notifications' : 'Enable Notifications'}
         </button>
       </div>
 
