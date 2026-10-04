@@ -1,27 +1,21 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { apiRequest } from '../api/client';
 import { DisclaimerBanner } from '../components/common/DisclaimerBanner';
-import { Utensils, Camera, Upload, CheckCircle2, Sparkles, Plus } from 'lucide-react';
+import { Utensils, CheckCircle2, Sparkles, Plus, Calculator } from 'lucide-react';
 
 export const NutritionPage: React.FC = () => {
   const [summary, setSummary] = useState<any>(null);
   const [suggestions, setSuggestions] = useState<any>(null);
-  const [analyzing, setAnalyzing] = useState(false);
   const [foodAnalysis, setFoodAnalysis] = useState<any>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [analysisError, setAnalysisError] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraVideoRef = useRef<HTMLVideoElement>(null);
-  const cameraStreamRef = useRef<MediaStream | null>(null);
-  const [cameraOpen, setCameraOpen] = useState(false);
-  
-  // Correction Form
+
+  // Manual food analyzer — no camera, image upload, or vision AI.
   const [mealType, setMealType] = useState('Lunch');
   const [foodName, setFoodName] = useState('');
-  const [calories, setCalories] = useState(450);
-  const [protein, setProtein] = useState(18);
-  const [carbs, setCarbs] = useState(65);
-  const [fat, setFat] = useState(12);
+  const [portion, setPortion] = useState('1 serving');
+  const [calories, setCalories] = useState(0);
+  const [protein, setProtein] = useState(0);
+  const [carbs, setCarbs] = useState(0);
+  const [fat, setFat] = useState(0);
 
   const fetchSummary = () => {
     apiRequest('/nutrition/summary')
@@ -136,6 +130,26 @@ export const NutritionPage: React.FC = () => {
     e.target.value = '';
   };
 
+  const analyzeManualFood = () => {
+    const name = foodName.trim();
+    if (!name) return;
+
+    // User enters the nutrition values from a food label/reference.
+    // The app calculates macro calories and shows the result before saving.
+    const macroCalories = protein * 4 + carbs * 4 + fat * 9;
+    const estimatedCalories = calories > 0 ? calories : Math.round(macroCalories);
+
+    setCalories(estimatedCalories);
+    setFoodAnalysis({
+      food_name: name,
+      portion,
+      calories: estimatedCalories,
+      protein_g: protein,
+      carbs_g: carbs,
+      fat_g: fat,
+    });
+  };
+
   const handleLogMeal = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -143,18 +157,23 @@ export const NutritionPage: React.FC = () => {
         method: 'POST',
         body: JSON.stringify({
           meal_type: mealType,
-          food_name: foodName || 'South Indian Thali',
-          portion: '1 serving',
+          food_name: foodName.trim(),
+          portion,
           calories: Number(calories),
           protein_g: Number(protein),
           carbs_g: Number(carbs),
           fat_g: Number(fat),
-          is_ai_estimated: foodAnalysis ? true : false
+          is_ai_estimated: false
         })
       });
       fetchSummary();
       setFoodAnalysis(null);
       setFoodName('');
+      setPortion('1 serving');
+      setCalories(0);
+      setProtein(0);
+      setCarbs(0);
+      setFat(0);
     } catch (err: any) {
       alert(err.message || 'Failed to log meal');
     }
@@ -167,160 +186,72 @@ export const NutritionPage: React.FC = () => {
       {/* Header */}
       <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-2">
         <h2 className="font-extrabold text-lg text-slate-100 flex items-center gap-2">
-          <Utensils className="w-5 h-5 text-emerald-400" /> AI Food Vision & Macro Nutrition Tracker
+          <Utensils className="w-5 h-5 text-emerald-400" /> Manual Food & Nutrition Analyzer
         </h2>
         <p className="text-xs text-slate-400">
-          Upload meal photos for visual nutrition estimation with manual correction & personalized pantry suggestions
+          Enter your food, portion, and nutrition values manually. No camera or food-image analysis is used.
         </p>
       </div>
 
       {/* Daily Macro Progress */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
-          <p className="text-xs text-slate-400">Total Calories</p>
-          <p className="text-2xl font-extrabold text-slate-100 mt-1">{summary?.total_calories || 0} / {summary?.calorie_target || '—'} kcal</p>
-        </div>
-        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
-          <p className="text-xs text-slate-400">Protein</p>
-          <p className="text-2xl font-extrabold text-emerald-400 mt-1">{summary?.total_protein_g || 0}g</p>
-        </div>
-        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
-          <p className="text-xs text-slate-400">Carbohydrates</p>
-          <p className="text-2xl font-extrabold text-sky-400 mt-1">{summary?.total_carbs_g || 0}g</p>
-        </div>
-        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
-          <p className="text-xs text-slate-400">Fats</p>
-          <p className="text-2xl font-extrabold text-amber-400 mt-1">{summary?.total_fat_g || 0}g</p>
-        </div>
+        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl"><p className="text-xs text-slate-400">Total Calories</p><p className="text-2xl font-extrabold text-slate-100 mt-1">{summary?.total_calories || 0} / {summary?.calorie_target || '—'} kcal</p></div>
+        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl"><p className="text-xs text-slate-400">Protein</p><p className="text-2xl font-extrabold text-emerald-400 mt-1">{summary?.total_protein_g || 0}g</p></div>
+        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl"><p className="text-xs text-slate-400">Carbohydrates</p><p className="text-2xl font-extrabold text-sky-400 mt-1">{summary?.total_carbs_g || 0}g</p></div>
+        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl"><p className="text-xs text-slate-400">Fats</p><p className="text-2xl font-extrabold text-amber-400 mt-1">{summary?.total_fat_g || 0}g</p></div>
       </div>
 
-      {/* Main Grid: AI Camera Analyzer + Log Form */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* Food Camera Analyzer Card */}
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
-          <div className="flex items-center gap-2">
-            <Camera className="w-5 h-5 text-sky-400" />
-            <h3 className="font-bold text-sm text-slate-100">AI Food Image Analyzer</h3>
+      {/* Manual Food Analyzer */}
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-5">
+        <div className="flex items-center gap-2">
+          <Calculator className="w-5 h-5 text-sky-400" />
+          <div>
+            <h3 className="font-bold text-sm text-slate-100">Manual Food Analyzer</h3>
+            <p className="text-xs text-slate-400 mt-1">Enter the values for the amount you actually ate.</p>
           </div>
-
-          <div className="border-2 border-dashed border-slate-800 rounded-2xl p-6 text-center space-y-4 bg-slate-950">
-            {imagePreview ? (
-              <img src={imagePreview} alt="Selected food" className="max-h-56 w-full object-contain rounded-xl" />
-            ) : (
-              <Upload className="w-10 h-10 text-slate-500 mx-auto" />
-            )}
-            <p className="text-xs text-slate-400">
-              Take a photo or choose a real food image. The selected image is sent to the configured vision AI.
-            </p>
-            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-            <div className="flex flex-col sm:flex-row gap-2 justify-center">
-              <button type="button" onClick={openCamera} disabled={analyzing} className="px-5 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-emerald-500 font-bold text-slate-950 text-xs shadow-glow flex items-center justify-center gap-2">
-                <Camera className="w-4 h-4" />
-                {analyzing ? 'Analyzing Image...' : 'Open Camera'}
-              </button>
-              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={analyzing} className="px-5 py-2 rounded-xl border border-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-2">
-                <Upload className="w-4 h-4" /> Upload Photo
-              </button>
-              {imagePreview && !analyzing && (
-                <button type="button" onClick={openCamera} className="px-5 py-2 rounded-xl border border-slate-700 text-slate-200 font-bold text-xs">
-                  Take Another
-                </button>
-              )}
-            </div>
-            {cameraOpen && (
-              <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
-                <div className="w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-3xl p-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-slate-100 flex items-center gap-2"><Camera className="w-5 h-5 text-sky-400" /> Food Camera</h4>
-                    <button type="button" onClick={stopCamera} className="text-slate-400 hover:text-white text-xl">×</button>
-                  </div>
-                  <video ref={cameraVideoRef} autoPlay playsInline muted className="w-full aspect-video object-cover rounded-2xl bg-black" />
-                  <p className="text-xs text-slate-400 text-center">Point the camera at the food, then tap Capture Photo.</p>
-                  <div className="flex gap-2 justify-center">
-                    <button type="button" onClick={captureCameraPhoto} className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-emerald-500 font-bold text-slate-950 text-xs flex items-center gap-2">
-                      <Camera className="w-4 h-4" /> Capture Photo
-                    </button>
-                    <button type="button" onClick={stopCamera} className="px-6 py-2.5 rounded-xl border border-slate-700 text-slate-200 font-bold text-xs">Cancel</button>
-                  </div>
-                </div>
-              </div>
-            )}
-            {analysisError && <p className="text-xs text-red-400">{analysisError}</p>}
-          </div>
-
-          {foodAnalysis && (
-            <div className="p-4 rounded-2xl bg-sky-950/40 border border-sky-500/30 space-y-2 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-sky-300">{foodAnalysis.food_name}</span>
-                <span className="text-[10px] text-emerald-400 font-semibold">{foodAnalysis.confidence_percentage}% AI Confidence</span>
-              </div>
-              <p className="text-slate-400">Est. Serving: {foodAnalysis.estimated_serving}</p>
-              <p className="text-[10px] text-slate-500 italic">{foodAnalysis.disclaimer}</p>
-            </div>
-          )}
         </div>
 
-        {/* Meal Logging & Manual Correction Form */}
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
-          <h3 className="font-bold text-sm text-slate-100">Log / Edit Meal Record</h3>
-
-          <form onSubmit={handleLogMeal} className="space-y-3 text-xs">
-            <div>
-              <label className="block text-slate-300 font-semibold mb-1">Meal Type</label>
-              <select
-                value={mealType}
-                onChange={(e) => setMealType(e.target.value)}
-                className="w-full px-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-100"
-              >
-                <option value="Breakfast">Breakfast</option>
-                <option value="Lunch">Lunch</option>
-                <option value="Dinner">Dinner</option>
-                <option value="Snack">Snack</option>
+        <form onSubmit={(e) => { e.preventDefault(); analyzeManualFood(); }} className="space-y-4 text-xs">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div><label className="block text-slate-300 font-semibold mb-1">Meal Type</label>
+              <select value={mealType} onChange={(e) => setMealType(e.target.value)} className="w-full px-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-100">
+                <option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option>
               </select>
             </div>
-
-            <div>
-              <label className="block text-slate-300 font-semibold mb-1">Food Name</label>
-              <input
-                type="text"
-                value={foodName}
-                onChange={(e) => setFoodName(e.target.value)}
-                placeholder="e.g. Lentil Dal with Rice"
-                required
-                className="w-full px-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-100"
-              />
+            <div className="md:col-span-2"><label className="block text-slate-300 font-semibold mb-1">Food Name</label>
+              <input value={foodName} onChange={(e) => setFoodName(e.target.value)} placeholder="e.g. Rice with dal and 2 eggs" required className="w-full px-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-100" />
             </div>
+          </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Calories (kcal)</label>
-                <input
-                  type="number"
-                  value={calories}
-                  onChange={(e) => setCalories(Number(e.target.value))}
-                  className="w-full px-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-100"
-                />
-              </div>
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Protein (g)</label>
-                <input
-                  type="number"
-                  value={protein}
-                  onChange={(e) => setProtein(Number(e.target.value))}
-                  className="w-full px-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-100"
-                />
-              </div>
+          <div><label className="block text-slate-300 font-semibold mb-1">Portion</label>
+            <input value={portion} onChange={(e) => setPortion(e.target.value)} placeholder="e.g. 1 cup, 2 eggs, 150 g" required className="w-full px-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-100" />
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div><label className="block text-slate-300 font-semibold mb-1">Calories (kcal)</label><input type="number" min="0" value={calories} onChange={(e)=>setCalories(Number(e.target.value))} className="w-full px-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-100" /></div>
+            <div><label className="block text-slate-300 font-semibold mb-1">Protein (g)</label><input type="number" min="0" value={protein} onChange={(e)=>setProtein(Number(e.target.value))} className="w-full px-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-100" /></div>
+            <div><label className="block text-slate-300 font-semibold mb-1">Carbs (g)</label><input type="number" min="0" value={carbs} onChange={(e)=>setCarbs(Number(e.target.value))} className="w-full px-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-100" /></div>
+            <div><label className="block text-slate-300 font-semibold mb-1">Fat (g)</label><input type="number" min="0" value={fat} onChange={(e)=>setFat(Number(e.target.value))} className="w-full px-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-100" /></div>
+          </div>
+
+          <button type="submit" className="w-full py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-emerald-500 font-bold text-slate-950 text-xs shadow-glow flex items-center justify-center gap-2">
+            <Calculator className="w-4 h-4" /> Analyze Food Manually
+          </button>
+        </form>
+
+        {foodAnalysis && (
+          <div className="p-4 rounded-2xl bg-sky-950/40 border border-sky-500/30 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-sky-300">{foodAnalysis.food_name}</span>
+              <span className="text-[10px] text-emerald-400 font-semibold">MANUAL ENTRY</span>
             </div>
-
-            <button
-              type="submit"
-              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-emerald-500 font-bold text-slate-950 text-xs shadow-glow flex items-center justify-center gap-1"
-            >
-              <Plus className="w-4 h-4" /> Save Meal Record
-            </button>
-          </form>
-        </div>
+            <p className="text-xs text-slate-400">Portion: {foodAnalysis.portion}</p>
+            <div className="grid grid-cols-4 gap-2 text-xs text-slate-300">
+              <span>{foodAnalysis.calories} kcal</span><span>{foodAnalysis.protein_g}g protein</span><span>{foodAnalysis.carbs_g}g carbs</span><span>{foodAnalysis.fat_g}g fat</span>
+            </div>
+            <button type="button" onClick={handleLogMeal} className="w-full py-2 rounded-xl border border-emerald-500/30 text-emerald-300 font-bold">Save Meal Record</button>
+          </div>
+        )}
       </div>
 
       {/* Practical Food Suggestions */}
