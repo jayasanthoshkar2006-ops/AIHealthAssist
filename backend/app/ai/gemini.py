@@ -1,7 +1,6 @@
 import base64
 import json
 import requests
-import google.generativeai as genai
 from typing import Dict, Any, List
 from app.config import settings
 from app.ai.provider import BaseAIProvider
@@ -10,9 +9,36 @@ from app.ai.local_heuristic import LocalHeuristicProvider
 class GeminiProvider(BaseAIProvider):
     def __init__(self, api_key: str):
         self.api_key = api_key
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel("gemini-2.5-flash-lite")
+        self.model_name = "gemini-2.5-flash-lite"
         self.fallback = LocalHeuristicProvider()
+
+    def _generate_content(self, prompt: str) -> str:
+        """Call Gemini through the REST API so deployment does not depend on the deprecated SDK."""
+        endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent"
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.4}
+        }
+        response = requests.post(
+            endpoint,
+            headers={
+                "x-goog-api-key": self.api_key,
+                "Content-Type": "application/json"
+            },
+            json=payload,
+            timeout=45,
+        )
+        if not response.ok:
+            raise RuntimeError(f"Gemini API HTTP {response.status_code}: {response.text[:1000]}")
+        body = response.json()
+        candidates = body.get("candidates") or []
+        if not candidates:
+            raise RuntimeError(f"Gemini returned no candidates: {json.dumps(body)[:1000]}")
+        parts = ((candidates[0].get("content") or {}).get("parts") or [])
+        text = "".join(str(part.get("text", "")) for part in parts if part.get("text")).strip()
+        if not text:
+            raise RuntimeError(f"Gemini returned no text: {json.dumps(body)[:1000]}")
+        return text
 
     def analyze_lifestyle_resources(self, profile: Dict[str, Any], resources: Dict[str, Any]) -> Dict[str, Any]:
         try:
@@ -25,7 +51,7 @@ class GeminiProvider(BaseAIProvider):
             realistic_meal_possibilities, available_time_slots, possible_conflicts,
             personalized_recommendations.
             """
-            response = self.model.generate_content(prompt)
+            response = self._generate_content(prompt)
             return json.loads(response.text.strip())
         except Exception:
             return self.fallback.analyze_lifestyle_resources(profile, resources)
@@ -236,7 +262,7 @@ RULES:
   back to health if the user is simply greeting, thanking, or making small talk.
 """
             response = self.model.generate_content(prompt)
-            text = (response.text or "").strip()
+            text = (response or "").strip()
             if not text:
                 raise RuntimeError("Gemini returned an empty response")
 
