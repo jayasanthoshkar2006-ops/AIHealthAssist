@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiRequest } from '../api/client';
 import { DisclaimerBanner } from '../components/common/DisclaimerBanner';
-import { Pill, Calendar, Plus, Clock, AlertCircle, Bell, BellOff, Pencil, X, Save } from 'lucide-react';
+import { Pill, Calendar, Plus, Clock, AlertCircle, Bell, BellOff, Pencil, X, Save, Trash2 } from 'lucide-react';
 import { notificationsEnabled, requestNotificationPermission, disableNotifications } from '../services/notificationService';
 
 export const RemindersPage: React.FC = () => {
@@ -15,11 +15,19 @@ export const RemindersPage: React.FC = () => {
   const [dosage, setDosage] = useState('1 tablet');
   const [remTime, setRemTime] = useState('08:00');
   const [editingMedId, setEditingMedId] = useState<number | null>(null);
+  const [editingAppointmentId, setEditingAppointmentId] = useState<number | null>(null);
 
   // Appointment Form
   const [appTitle, setAppTitle] = useState('');
   const [appCategory, setAppCategory] = useState('Doctor');
   const [appTime, setAppTime] = useState(new Date().toISOString().slice(0, 16));
+
+  const formatDateTimeLocal = (value: string) => {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return value?.slice(0, 16) || '';
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  };
 
   const fetchData = () => {
     apiRequest('/medications')
@@ -71,6 +79,30 @@ export const RemindersPage: React.FC = () => {
     setRemTime('08:00');
   };
 
+  const deleteMedication = async (id: number, name: string) => {
+    if (!window.confirm('Delete medication reminder for "' + name + '"?')) return;
+    try {
+      await apiRequest('/medications/' + id, { method: 'DELETE' });
+      if (editingMedId === id) cancelEditMedication();
+      fetchData();
+    } catch (err: any) { alert(err.message || 'Failed to delete medication reminder'); }
+  };
+
+  const startEditAppointment = (a: any) => {
+    setEditingAppointmentId(a.id); setAppTitle(a.title || ''); setAppCategory(a.category || 'Doctor'); setAppTime(formatDateTimeLocal(a.date_time));
+  };
+  const cancelEditAppointment = () => {
+    setEditingAppointmentId(null); setAppTitle(''); setAppCategory('Doctor'); setAppTime(new Date().toISOString().slice(0, 16));
+  };
+  const deleteAppointment = async (id: number, title: string) => {
+    if (!window.confirm('Delete appointment "' + title + '"?')) return;
+    try {
+      await apiRequest('/appointments/' + id, { method: 'DELETE' });
+      if (editingAppointmentId === id) cancelEditAppointment();
+      fetchData();
+    } catch (err: any) { alert(err.message || 'Failed to delete appointment'); }
+  };
+
   const handleAddMed = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!medName.trim()) return;
@@ -97,8 +129,8 @@ export const RemindersPage: React.FC = () => {
     if (!appTitle.trim()) return;
 
     try {
-      await apiRequest('/appointments', {
-        method: 'POST',
+      await apiRequest(editingAppointmentId ? '/appointments/' + editingAppointmentId : '/appointments', {
+        method: editingAppointmentId ? 'PUT' : 'POST',
         body: JSON.stringify({
           title: appTitle,
           category: appCategory,
@@ -106,7 +138,7 @@ export const RemindersPage: React.FC = () => {
           reminder_enabled: true
         })
       });
-      setAppTitle('');
+      cancelEditAppointment();
       fetchData();
     } catch (err: any) {
       alert(err.message || 'Failed to add appointment');
@@ -227,6 +259,15 @@ export const RemindersPage: React.FC = () => {
                   <span className="font-mono text-sky-400 font-bold">{m.reminder_time}</span>
                   <button
                     type="button"
+                    onClick={() => deleteMedication(m.id, m.name)}
+                    className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-rose-400"
+                    title="Delete medication reminder"
+                    aria-label={'Delete ' + m.name + ' reminder'}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => startEditMedication(m)}
                     className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-400"
                     title="Edit medication reminder"
@@ -288,8 +329,13 @@ export const RemindersPage: React.FC = () => {
               type="submit"
               className="w-full py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-emerald-500 font-bold text-slate-950 text-xs shadow-glow flex items-center justify-center gap-1"
             >
-              <Plus className="w-4 h-4" /> Add Appointment
+              {editingAppointmentId ? <Save className="w-4 h-4" /> : <Plus className="w-4 h-4" />} {editingAppointmentId ? 'Save Appointment Changes' : 'Add Appointment'}
             </button>
+            {editingAppointmentId && (
+              <button type="button" onClick={cancelEditAppointment} className="w-full py-2 rounded-xl bg-slate-800 border border-slate-700 font-bold text-slate-300 text-xs flex items-center justify-center gap-1">
+                <X className="w-4 h-4" /> Cancel Edit
+              </button>
+            )}
           </form>
 
           <div className="space-y-2 text-xs pt-2">
@@ -299,9 +345,11 @@ export const RemindersPage: React.FC = () => {
                   <p className="font-bold text-slate-200">{a.title}</p>
                   <p className="text-slate-400 text-[11px]">{a.category}</p>
                 </div>
-                <span className="text-emerald-400 font-semibold text-[11px]">
-                  {new Date(a.date_time).toLocaleString()}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-emerald-400 font-semibold text-[11px] text-right">{new Date(a.date_time).toLocaleString()}</span>
+                  <button type="button" onClick={() => startEditAppointment(a)} className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-400" title="Edit appointment"><Pencil className="w-3.5 h-3.5" /></button>
+                  <button type="button" onClick={() => deleteAppointment(a.id, a.title)} className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-rose-400" title="Delete appointment"><Trash2 className="w-3.5 h-3.5" /></button>
+                </div>
               </div>
             ))}
           </div>
