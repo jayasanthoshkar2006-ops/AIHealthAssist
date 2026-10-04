@@ -102,6 +102,35 @@ def create_meal_log(data: NutritionLogCreate, current_user: User = Depends(get_c
     db.refresh(log)
     return {"message": "Meal logged successfully", "id": log.id}
 
+@router.get("/remembered-foods")
+def get_remembered_foods(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Return this user's previously saved foods for quick manual reuse."""
+    logs = db.query(NutritionLog).filter(
+        NutritionLog.user_id == current_user.id
+    ).order_by(NutritionLog.log_date.desc(), NutritionLog.id.desc()).all()
+
+    # Keep the newest saved nutrition values for each food + portion combination.
+    seen = set()
+    foods = []
+    for log in logs:
+        key = ((log.food_name or "").strip().lower(), (log.portion or "").strip().lower())
+        if not key[0] or key in seen:
+            continue
+        seen.add(key)
+        foods.append({
+            "food_key": f"{log.id}-{abs(hash(key))}",
+            "food_name": log.food_name,
+            "portion": log.portion,
+            "calories": log.calories,
+            "protein_g": log.protein_g,
+            "carbs_g": log.carbs_g,
+            "fat_g": log.fat_g,
+        })
+        if len(foods) >= 12:
+            break
+
+    return {"foods": foods}
+
 @router.get("/summary")
 def get_nutrition_summary(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     logs = db.query(NutritionLog).filter(NutritionLog.user_id == current_user.id, NutritionLog.log_date == date.today()).all()
