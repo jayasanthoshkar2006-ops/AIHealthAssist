@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiRequest } from '../api/client';
 import { DisclaimerBanner } from '../components/common/DisclaimerBanner';
-import { Moon, Clock, Sparkles, Plus } from 'lucide-react';
+import { Moon, Sparkles, Plus } from 'lucide-react';
 
 export const SleepPage: React.FC = () => {
   const [data, setData] = useState<any>(null);
@@ -130,7 +130,13 @@ export const SleepPage: React.FC = () => {
             <h3 className="font-bold text-sm text-slate-100">AI Pattern Observations</h3>
           </div>
 
-          {data?.analysis && (
+          {data?.analysis ? (
+            data.analysis.average_duration === null ? (
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-slate-300">
+                <p className="font-semibold text-slate-100">No sleep data yet</p>
+                <p className="mt-1 text-slate-400">Save a few nights of sleep records to get personalized pattern analysis.</p>
+              </div>
+            ) : (
             <div className="space-y-3 text-xs">
               <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-1">
                 <p className="text-slate-400">Average Sleep Duration</p>
@@ -146,9 +152,28 @@ export const SleepPage: React.FC = () => {
                 </ul>
               </div>
 
+              {data.analysis.average_quality !== null && (
+                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-1">
+                  <p className="text-slate-400">Average Quality</p>
+                  <p className="text-2xl font-bold text-indigo-400">{data.analysis.average_quality}/10</p>
+                </div>
+              )}
+
+              {data.analysis.consistency_score !== null && (
+                <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-1">
+                  <p className="text-slate-400">Duration Consistency</p>
+                  <p className="text-2xl font-bold text-indigo-400">{data.analysis.consistency_score}%</p>
+                </div>
+              )}
+
               <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-slate-300">
                 <strong>Recommendation:</strong> {data.analysis.recommendation}
               </div>
+            </div>
+            )
+          ) : (
+            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-slate-400 text-xs">
+              Unable to load sleep analysis right now.
             </div>
           )}
         </div>
