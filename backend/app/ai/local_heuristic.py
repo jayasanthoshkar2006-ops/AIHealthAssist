@@ -235,12 +235,19 @@ class LocalHeuristicProvider(BaseAIProvider):
             "how are you", "how are you doing", "how are things"
         }
         is_identity_question = msg_lower in {
-            "who are you", "what are you", "what can you do", "what do you do"
+            "who", "who are you", "what are you", "what can you do", "what do you do",
+            "i am who", "who am i", "what is healthassist ai", "what is this"
         }
         is_thanks = msg_lower in {
             "thanks", "thank you", "thank you so much", "thanks a lot"
         }
         is_acknowledgement = msg_lower in {"ok", "okay", "sure", "alright", "all right"}
+
+        is_tiredness_question = any(term in msg_lower for term in [
+            "i am tired", "i'm tired", "im tired", "feeling tired", "feel tired",
+            "tired lately", "low energy", "no energy", "fatigued", "feeling exhausted",
+            "i am exhausted", "i'm exhausted"
+        ])
         is_negative_short = msg_lower in {
             "no", "nope", "nah", "not now", "nothing", "leave it", "forget it"
         }
@@ -321,12 +328,27 @@ class LocalHeuristicProvider(BaseAIProvider):
                 response = "நான் நன்றாக இருக்கிறேன், உதவ தயாராக இருக்கிறேன்! இன்று எதைப் பற்றி உதவி வேண்டும்?"
 
         elif is_identity_question:
+            if msg_lower in {"who", "i am who", "who am i"}:
+                response = (
+                    f"You’re the person using HealthAssist AI. I know you as a {profession} from your current profile. "
+                    "I can use the profile information you provided to personalize your schedule, workouts, nutrition, sleep, and goals."
+                )
+            else:
+                response = (
+                    "I’m HealthAssist AI, your personal health and lifestyle assistant. "
+                    "I can help with your schedule, workouts, nutrition, sleep, goals, and wellness questions."
+                )
+            if is_tamil:
+                response = "நீங்கள் HealthAssist AI-ஐ பயன்படுத்தும் user. உங்கள் profile-ல் உள்ள தகவல்களை வைத்து schedule, workout, nutrition, sleep மற்றும் goals-ஐ personalize செய்ய உதவுகிறேன்."
+
+        elif is_tiredness_question:
             response = (
-                "I’m HealthAssist AI, your personal health and lifestyle assistant. "
-                "I can help with your schedule, workouts, nutrition, sleep, goals, and wellness questions."
+                "If you’ve been feeling tired lately, look at a few basics first: sleep duration and consistency, "
+                "meal timing and overall food intake, hydration, workload, stress, and recent exercise or recovery. "
+                "If the tiredness is persistent, severe, or comes with other concerning symptoms, consider speaking with a healthcare professional."
             )
             if is_tamil:
-                response = "நான் HealthAssist AI, உங்கள் personal health மற்றும் lifestyle assistant. Schedule, workout, nutrition, sleep, goals மற்றும் wellness கேள்விகளில் உதவ முடியும்."
+                response = "சமீபமாக tired-ஆக இருந்தால் முதலில் sleep duration/consistency, உணவு நேரம் மற்றும் போதுமான உணவு, hydration, workload, stress மற்றும் exercise recovery ஆகியவற்றைப் பாருங்கள். இது தொடர்ந்து அல்லது மிகவும் அதிகமாக இருந்தால் healthcare professional-ஐ அணுகுவது நல்லது."
 
         elif is_thanks:
             response = "You’re welcome! I’m here whenever you need help."
