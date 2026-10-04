@@ -213,7 +213,7 @@ export const RemindersPage: React.FC = () => {
               >
                 <X className="w-4 h-4" /> Cancel Edit
               </button>
-            </button>
+            )}
           </form>
 
           <div className="space-y-2 text-xs pt-2">
