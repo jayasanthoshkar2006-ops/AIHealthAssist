@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { apiRequest } from '../api/client';
 import { DisclaimerBanner } from '../components/common/DisclaimerBanner';
-import { Pill, Calendar, Plus, Clock, AlertCircle } from 'lucide-react';
+import { Pill, Calendar, Plus, Clock, AlertCircle, Bell, BellOff } from 'lucide-react';
+import { notificationsEnabled, requestNotificationPermission, disableNotifications } from '../services/notificationService';
 
 export const RemindersPage: React.FC = () => {
   const [medications, setMedications] = useState<any[]>([]);
   const [appointments, setAppointments] = useState<any[]>([]);
+  const [notificationsOn, setNotificationsOn] = useState(notificationsEnabled());
+  const [notificationMessage, setNotificationMessage] = useState('');
 
   // Medication Form
   const [medName, setMedName] = useState('');
@@ -30,6 +33,29 @@ export const RemindersPage: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const enableNotifications = async () => {
+    if (!('Notification' in window)) {
+      setNotificationMessage('This browser does not support notifications.');
+      return;
+    }
+    const permission = await requestNotificationPermission();
+    if (permission === 'granted') {
+      setNotificationsOn(true);
+      setNotificationMessage('Notifications enabled. Keep HealthAssist AI open for scheduled reminders.');
+      new Notification('HealthAssist AI', { body: 'Notifications are working correctly.' });
+    } else {
+      setNotificationsOn(false);
+      setNotificationMessage('Notification permission was not granted. Allow notifications in your browser settings.');
+    }
+  };
+
+  const turnOffNotifications = () => {
+    disableNotifications();
+    setNotificationsOn(false);
+    setNotificationMessage('Notifications disabled.');
+  };
+
 
   const handleAddMed = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,6 +110,32 @@ export const RemindersPage: React.FC = () => {
         <p className="text-xs text-slate-400">
           User-configured reminder engine for daily medications & upcoming medical/fitness appointments
         </p>
+      </div>
+
+
+
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 className="font-bold text-sm text-slate-100 flex items-center gap-2">
+            {notificationsOn ? <Bell className="w-4 h-4 text-emerald-400" /> : <BellOff className="w-4 h-4 text-slate-400" />}
+            Browser Notifications
+          </h3>
+          <p className="text-xs text-slate-400 mt-1">
+            {notificationsOn
+              ? 'Working: medication and appointment reminders are checked every 30 seconds while the app is open.'
+              : 'Enable notifications to receive HealthAssist AI reminders on this device.'}
+          </p>
+          {notificationMessage && (
+            <p className="text-xs text-sky-300 mt-2">{notificationMessage}</p>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={notificationsOn ? turnOffNotifications : enableNotifications}
+          className={`px-4 py-2.5 rounded-xl font-bold text-xs ${notificationsOn ? 'bg-slate-800 text-slate-200 border border-slate-700' : 'bg-gradient-to-r from-sky-500 to-emerald-500 text-slate-950'}`}
+        >
+          {notificationsOn ? 'Disable Notifications' : 'Enable & Test Notifications'}
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
