@@ -82,6 +82,38 @@ def update_medication(
 
     db.commit()
     db.refresh(med)
+@router.delete("/medications/{medication_id}")
+def delete_medication(
+    medication_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    med = (
+        db.query(Medication)
+        .filter(
+            Medication.id == medication_id,
+            Medication.user_id == current_user.id,
+            Medication.is_active == True,
+        )
+        .first()
+    )
+    if not med:
+        raise HTTPException(status_code=404, detail="Medication reminder not found")
+
+    old_title = f"Medication Reminder: {med.name}"
+    db.query(Notification).filter(
+        Notification.user_id == current_user.id,
+        Notification.category == "Medication",
+        Notification.title == old_title,
+    ).delete(synchronize_session=False)
+
+    med.is_active = False
+    db.commit()
+    return {
+        "message": "Medication reminder deleted successfully",
+        "id": medication_id,
+    }
+
     return {
         "message": "Medication reminder updated successfully",
         "id": med.id,
