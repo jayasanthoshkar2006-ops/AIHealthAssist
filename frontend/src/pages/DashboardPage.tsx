@@ -34,6 +34,8 @@ export const DashboardPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const { t } = useTranslation();
 
+  const isDemo = data?.is_demo === true;
+
   useEffect(() => {
     apiRequest('/dashboard')
       .then((res) => {
@@ -94,8 +96,6 @@ export const DashboardPage: React.FC = () => {
    *
    * for demo@example.com
    */
-  const isDemo = data?.is_demo === true;
-
   /*
    * REAL USER DATA STATUS
    *
