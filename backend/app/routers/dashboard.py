@@ -21,7 +21,7 @@ from app.routers.auth import get_current_user
 
 router = APIRouter(
     prefix="/dashboard",
-    tags=["Dashboard"]
+    tags=["Dashboard"],
 )
 
 
@@ -34,7 +34,7 @@ def get_dashboard(
 
     start_of_today = datetime.combine(
         today,
-        datetime.min.time()
+        datetime.min.time(),
     )
 
     start_of_next_day = start_of_today + timedelta(days=1)
@@ -43,9 +43,7 @@ def get_dashboard(
     # DEMO USER CHECK
     # ============================================================
 
-    is_demo_user = (
-        current_user.email == "demo@example.com"
-    )
+    is_demo_user = current_user.email == "demo@example.com"
 
     # ============================================================
     # USER PROFILE
@@ -106,7 +104,7 @@ def get_dashboard(
     average_form = (
         round(
             sum(form_scores) / len(form_scores),
-            1
+            1,
         )
         if form_scores
         else 0
@@ -161,7 +159,7 @@ def get_dashboard(
         )
         .order_by(
             SleepRecord.sleep_date.desc(),
-            SleepRecord.id.desc()
+            SleepRecord.id.desc(),
         )
         .first()
     )
@@ -202,7 +200,7 @@ def get_dashboard(
         if getattr(
             habit,
             "completed",
-            False
+            False,
         )
     )
 
@@ -211,7 +209,7 @@ def get_dashboard(
     habit_completion = (
         round(
             (completed_habits / total_habits) * 100,
-            1
+            1,
         )
         if total_habits > 0
         else 0
@@ -245,7 +243,7 @@ def get_dashboard(
         getattr(
             streak,
             "current_streak",
-            0
+            0,
         )
         if streak
         else 0
@@ -283,17 +281,17 @@ def get_dashboard(
 
             bmi = round(
                 weight / (height_m * height_m),
-                1
+                1,
             )
 
     # ============================================================
-    # ============================================================
     # DEMO DATA
     # ============================================================
-    # These values are ONLY returned to demo@example.com.
     #
-    # Normal users continue using their real database values.
-    # ============================================================
+    # Fake values are returned ONLY for:
+    # demo@example.com
+    #
+    # Normal users continue using their real database data.
     # ============================================================
 
     if is_demo_user:
@@ -340,7 +338,7 @@ def get_dashboard(
             70.0 / (
                 demo_height_m * demo_height_m
             ),
-            1
+            1,
         )
 
         # --------------------------------------------------------
@@ -433,116 +431,64 @@ def get_dashboard(
         # DEMO WORKOUT GRAPH
         # --------------------------------------------------------
 
-        workout_trend = [
-            {
-                "day": "Mon",
-                "date": str(
-                    today - timedelta(days=6)
-                ),
-                "reps": 40,
-                "form": 88,
-            },
-            {
-                "day": "Tue",
-                "date": str(
-                    today - timedelta(days=5)
-                ),
-                "reps": 45,
-                "form": 90,
-            },
-            {
-                "day": "Wed",
-                "date": str(
-                    today - timedelta(days=4)
-                ),
-                "reps": 50,
-                "form": 92,
-            },
-            {
-                "day": "Thu",
-                "date": str(
-                    today - timedelta(days=3)
-                ),
-                "reps": 35,
-                "form": 87,
-            },
-            {
-                "day": "Fri",
-                "date": str(
-                    today - timedelta(days=2)
-                ),
-                "reps": 60,
-                "form": 94,
-            },
-            {
-                "day": "Sat",
-                "date": str(
-                    today - timedelta(days=1)
-                ),
-                "reps": 55,
-                "form": 93,
-            },
-            {
-                "day": "Sun",
-                "date": str(today),
-                "reps": 65,
-                "form": 95,
-            },
+        demo_workout_values = [
+            (40, 88),
+            (45, 90),
+            (50, 92),
+            (35, 87),
+            (60, 94),
+            (55, 93),
+            (65, 95),
         ]
+
+        workout_trend = []
+
+        for index, (reps, form) in enumerate(
+            demo_workout_values
+        ):
+            graph_day = today - timedelta(
+                days=6 - index
+            )
+
+            workout_trend.append(
+                {
+                    "day": graph_day.strftime("%a"),
+                    "date": str(graph_day),
+                    "reps": reps,
+                    "form": form,
+                }
+            )
 
         # --------------------------------------------------------
         # DEMO SLEEP GRAPH
         # --------------------------------------------------------
 
-        sleep_trend = [
-            {
-                "day": "Mon",
-                "date": str(
-                    today - timedelta(days=6)
-                ),
-                "hours": 7.2,
-            },
-            {
-                "day": "Tue",
-                "date": str(
-                    today - timedelta(days=5)
-                ),
-                "hours": 7.5,
-            },
-            {
-                "day": "Wed",
-                "date": str(
-                    today - timedelta(days=4)
-                ),
-                "hours": 6.8,
-            },
-            {
-                "day": "Thu",
-                "date": str(
-                    today - timedelta(days=3)
-                ),
-                "hours": 7.8,
-            },
-            {
-                "day": "Fri",
-                "date": str(
-                    today - timedelta(days=2)
-                ),
-                "hours": 7.4,
-            },
-            {
-                "day": "Sat",
-                "date": str(
-                    today - timedelta(days=1)
-                ),
-                "hours": 8.1,
-            },
-            {
-                "day": "Sun",
-                "date": str(today),
-                "hours": 7.6,
-            },
+        demo_sleep_values = [
+            7.2,
+            7.5,
+            6.8,
+            7.8,
+            7.4,
+            8.1,
+            7.6,
         ]
+
+        sleep_trend = []
+
+        for index, hours in enumerate(
+            demo_sleep_values
+        ):
+            graph_day = today - timedelta(
+                days=6 - index
+            )
+
+            sleep_trend.append(
+                {
+                    "day": graph_day.strftime("%a"),
+                    "date": str(graph_day),
+                    "hours": hours,
+                }
+            )
 
         # --------------------------------------------------------
         # DEMO AI INSIGHTS
@@ -561,25 +507,15 @@ def get_dashboard(
 
         return {
             "profile": demo_profile,
-
             "schedule": demo_schedule,
-
             "bmi": demo_bmi,
-
             "today": demo_today,
-
             "habits": demo_habits,
-
             "goals": demo_goals,
-
             "streak": demo_streak,
-
             "today_plan": demo_today_plan,
-
             "workout_trend": workout_trend,
-
             "sleep_trend": sleep_trend,
-
             "ai_insights": demo_insights,
         }
 
@@ -599,7 +535,7 @@ def get_dashboard(
             Workout.user_id == current_user.id,
             Workout.created_at >= datetime.combine(
                 trend_start,
-                datetime.min.time()
+                datetime.min.time(),
             ),
             Workout.created_at < start_of_next_day,
         )
@@ -643,22 +579,24 @@ def get_dashboard(
             round(
                 sum(day_form_scores)
                 / len(day_form_scores),
-                1
+                1,
             )
             if day_form_scores
             else None
         )
 
-        workout_trend.append({
-            "day": trend_day.strftime("%a"),
-            "date": str(trend_day),
-            "reps": (
-                day_reps
-                if day_workouts
-                else None
-            ),
-            "form": day_form,
-        })
+        workout_trend.append(
+            {
+                "day": trend_day.strftime("%a"),
+                "date": str(trend_day),
+                "reps": (
+                    day_reps
+                    if day_workouts
+                    else None
+                ),
+                "form": day_form,
+            }
+        )
 
     # ============================================================
     # 7-DAY REAL SLEEP TREND
@@ -673,7 +611,7 @@ def get_dashboard(
         )
         .order_by(
             SleepRecord.sleep_date.asc(),
-            SleepRecord.id.asc()
+            SleepRecord.id.asc(),
         )
         .all()
     )
@@ -700,18 +638,21 @@ def get_dashboard(
             trend_day
         )
 
-        sleep_trend.append({
-            "day": trend_day.strftime("%a"),
-            "date": str(trend_day),
-            "hours": (
-                record.duration_hours
-                if (
-                    record
-                    and record.duration_hours is not None
-                )
-                else None
-            ),
-        })
+        sleep_trend.append(
+            {
+                "day": trend_day.strftime("%a"),
+                "date": str(trend_day),
+                "hours": (
+                    record.duration_hours
+                    if (
+                        record
+                        and record.duration_hours
+                        is not None
+                    )
+                    else None
+                ),
+            }
+        )
 
     # ============================================================
     # REAL USER AI INSIGHTS
@@ -753,7 +694,6 @@ def get_dashboard(
             )
 
     if not insights:
-
         insights.append(
             "Start recording workouts and sleep "
             "to receive personalized insights."
@@ -764,7 +704,6 @@ def get_dashboard(
     # ============================================================
 
     return {
-
         "profile": (
             {
                 "name": profile.name,
@@ -840,27 +779,27 @@ def get_dashboard(
                 "title": getattr(
                     goal,
                     "title",
-                    None
+                    None,
                 ),
                 "description": getattr(
                     goal,
                     "description",
-                    None
+                    None,
                 ),
                 "target_value": getattr(
                     goal,
                     "target_value",
-                    None
+                    None,
                 ),
                 "current_value": getattr(
                     goal,
                     "current_value",
-                    None
+                    None,
                 ),
                 "status": getattr(
                     goal,
                     "status",
-                    None
+                    None,
                 ),
             }
             for goal in goals
