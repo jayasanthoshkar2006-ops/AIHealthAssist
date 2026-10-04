@@ -193,21 +193,62 @@ class LocalHeuristicProvider(BaseAIProvider):
         }
 
     def chat_response(self, message: str, context: Dict[str, Any], use_internet: bool = False, language: str = "en") -> Dict[str, Any]:
-        msg_lower = message.lower().strip()
-        is_tamil = language == "ta" or any(char in message for char in ["என்ன", "வணக்கம்", "இன்று", "எனக்கு", "எத்தனை", "சாப்பிட"])
+        """Conversation-first local assistant with controlled health tools.
+
+        This remains fully offline-capable and deterministic, but uses recent
+        conversation history to resolve short replies such as "no", "bye",
+        "move it", and follow-up questions before falling back to a generic answer.
+        """
+        msg = message.strip()
+        msg_lower = msg.lower()
+        history = context.get("conversation_history") or []
+        last_user = ""
+        last_assistant = ""
+        for turn in reversed(history):
+            if turn.get("role") == "user" and not last_user:
+                last_user = str(turn.get("content", ""))
+            elif turn.get("role") == "assistant" and not last_assistant:
+                last_assistant = str(turn.get("content", ""))
+
+        is_tamil = language == "ta" or any(
+            char in message for char in ["என்ன", "வணக்கம்", "இன்று", "எனக்கு", "எத்தனை", "சாப்பிட"]
+        )
+        profession = context.get("profession") or "your current lifestyle"
 
         tool_executed = None
         action_performed = None
         citations = None
 
-        # IMPORTANT: current/official information must be detected BEFORE generic nutrition
-        # matching. Otherwise phrases such as "latest WHO nutrition guideline" get routed
-        # to the pre-workout food helper simply because they contain the word "nutrition".
+        # Explicit conversation controls come before domain tools.
+        is_goodbye = msg_lower in {
+            "bye", "goodbye", "good bye", "see you", "see ya",
+            "ok bye", "okay bye", "bye bye", "goaway", "go away",
+            "leave me alone", "stop", "stop talking"
+        }
+        is_greeting = msg_lower in {
+            "hi", "hii", "hiii", "hello", "hey", "hey there",
+            "good morning", "good afternoon", "good evening"
+        }
+        is_negative_short = msg_lower in {
+            "no", "nope", "nah", "not now", "nothing", "leave it", "forget it"
+        }
+
+        # Resolve pronouns/follow-ups from the previous turn.
+        refers_to_workout = any(term in msg_lower for term in [
+            "workout", "exercise", "training", "session", "it", "that"
+        ]) and (
+            "workout" in last_user.lower()
+            or "workout" in last_assistant.lower()
+            or "exercise" in last_user.lower()
+            or "exercise" in last_assistant.lower()
+        )
+
         is_move_workout = (
-            ("move" in msg_lower and "workout" in msg_lower)
-            or ("reschedule" in msg_lower and "workout" in msg_lower)
-            or ("change" in msg_lower and "workout" in msg_lower)
-            or ("workout" in msg_lower and ("evening" in msg_lower or "morning" in msg_lower))
+            ("move" in msg_lower and ("workout" in msg_lower or refers_to_workout))
+            or ("reschedule" in msg_lower and ("workout" in msg_lower or refers_to_workout))
+            or ("change" in msg_lower and ("workout" in msg_lower or refers_to_workout))
+            or ("workout" in msg_lower and any(x in msg_lower for x in ["evening", "morning", "6 pm", "7 pm"]))
+            or ("move it" in msg_lower and refers_to_workout)
             or "மாற்று" in message
         )
 
@@ -229,30 +270,52 @@ class LocalHeuristicProvider(BaseAIProvider):
         )
 
         is_today_schedule = (
-            ("schedule" in msg_lower or "plan" in msg_lower)
-            and not is_move_workout
-        ) or "இன்றைக்கு" in message
+            (("schedule" in msg_lower or "plan" in msg_lower) and not is_move_workout)
+            or "what am i doing today" in msg_lower
+            or "what do i have today" in msg_lower
+            or "இன்றைக்கு" in message
+        )
 
-        if is_move_workout:
-            new_time = "19:00"
-            if "6 pm" in msg_lower or "6:00 pm" in msg_lower:
-                new_time = "18:00"
-            elif "7 pm" in msg_lower or "7:00 pm" in msg_lower:
-                new_time = "19:00"
-            response = f"Done. I moved your workout to {new_time[:2]}:{new_time[3:]}." if new_time != "19:00" else "Done. I moved your workout to 7:00 PM."
+        if is_goodbye:
+            response = "Bye! Take care and have a good day. I’ll be here whenever you need help with your wellness plan."
             if is_tamil:
-                response = "சரி. உங்கள் workout மாலை 7:00 மணிக்கு மாற்றப்பட்டுள்ளது."
+                response = "சரி, bye! உங்கள் நாளை நன்றாக கவனித்துக்கொள்ளுங்கள். தேவையான போது மீண்டும் கேளுங்கள்."
+
+        elif is_negative_short:
+            response = (
+                "No problem. I’ll leave it there. If you need help later, you can ask me about your schedule, "
+                "workouts, meals, sleep, or goals."
+            )
+            if is_tamil:
+                response = "பரவாயில்லை. இப்போது அதை விட்டுவிடலாம். பிறகு schedule, workout, உணவு, sleep அல்லது goals பற்றி கேட்கலாம்."
+
+        elif is_greeting:
+            response = (
+                f"Hi! I’m ready to help with your {profession} lifestyle. "
+                "What would you like to work on today—your schedule, workout, food, sleep, or a health/lifestyle question?"
+            )
+            if is_tamil:
+                response = "வணக்கம்! உங்கள் lifestyle-க்கு உதவ தயாராக இருக்கிறேன். இன்று schedule, workout, உணவு, sleep அல்லது health/lifestyle கேள்வி—எதைப் பற்றி உதவி வேண்டும்?"
+
+        elif is_move_workout:
+            new_time = "19:00"
+            if any(x in msg_lower for x in ["6 pm", "6:00 pm", "18:00", "6 in the evening"]):
+                new_time = "18:00"
+            elif any(x in msg_lower for x in ["7 pm", "7:00 pm", "19:00", "7 in the evening"]):
+                new_time = "19:00"
+            response = f"Done. I moved your workout to {_format_time(new_time)}."
+            if is_tamil:
+                response = f"சரி. உங்கள் workout {_format_time(new_time)}க்கு மாற்றப்பட்டுள்ளது."
             tool_executed = "update_schedule"
             action_performed = {"new_workout_time": new_time}
 
         elif is_current_guideline:
             if use_internet:
                 response = (
-                    "Yes — Internet Verification is ON, so this question should use the official WHO source, "
-                    "not your local nutrition helper. WHO's healthy-diet guidance emphasizes a varied diet with "
-                    "minimally processed foods, plenty of fruits and vegetables, adequate fibre, and limiting "
-                    "free sugars, saturated fat, trans fat, and excess salt. For the current official wording and "
-                    "any newer WHO publication, use the linked WHO source below."
+                    "I’ll verify this against the official WHO source. WHO healthy-diet guidance emphasizes "
+                    "a varied diet based mainly on minimally processed foods, plenty of fruit and vegetables, "
+                    "adequate fibre, and limiting free sugars, saturated and trans fats, and excess salt. "
+                    "Use the linked WHO source for the current official wording."
                 )
                 tool_executed = "internet_verify"
                 citations = [{
@@ -261,21 +324,23 @@ class LocalHeuristicProvider(BaseAIProvider):
                     "date": str(date.today())
                 }]
             else:
-                response = "Internet Verification is OFF. I cannot reliably claim the latest official WHO guidance from local data. Turn on Internet Verification and ask again so I can verify the current WHO guidance."
+                response = (
+                    "Internet Verification is OFF, so I won't claim this is the latest official WHO guidance. "
+                    "Turn on Internet Verification and ask again."
+                )
                 tool_executed = "internet_verification_required"
 
         elif is_food_question:
-            profession = context.get("profession", "college student")
             foods = context.get("available_foods") or ["banana", "milk", "eggs", "oats", "rice"]
             food_text = ", ".join(map(str, foods[:6]))
             response = (
-                f"For a pre-workout meal, keep it light and easy to digest. "
-                f"For you as a {profession}, try a banana with milk, or oats with fruit 60–90 minutes before training. "
-                f"If you need more protein, add an egg or another suitable protein source. "
-                f"Use foods you already have available: {food_text}. Avoid a very heavy or oily meal immediately before exercise."
+                f"For a pre-workout meal, keep it light and easy to digest. For your {profession} lifestyle, "
+                "a banana with milk or oats with fruit 60–90 minutes before training can work well. "
+                f"If you need more protein, add a suitable protein food. You currently have: {food_text}. "
+                "Avoid a very heavy or oily meal immediately before exercise."
             )
             if is_tamil:
-                response = "Workoutக்கு 60–90 நிமிடங்களுக்கு முன் லேசான, எளிதில் ஜீரணமாகும் உணவை எடுத்துக்கொள்ளுங்கள். வாழைப்பழம் + பால் அல்லது oats + பழம் நல்ல தேர்வு. கூடுதல் protein வேண்டுமெனில் முட்டை போன்ற protein உணவை சேர்க்கலாம்."
+                response = "Workoutக்கு 60–90 நிமிடங்களுக்கு முன் லேசான, எளிதில் ஜீரணமாகும் உணவை எடுத்துக்கொள்ளுங்கள். வாழைப்பழம் + பால் அல்லது oats + பழம் நல்ல தேர்வு. கூடுதல் protein தேவைப்பட்டால் பொருத்தமான protein உணவை சேர்க்கலாம்."
             tool_executed = "get_food_suggestion"
 
         elif is_weekly_workout_question:
@@ -287,42 +352,41 @@ class LocalHeuristicProvider(BaseAIProvider):
 
         elif is_today_schedule:
             schedule = context.get("today_schedule") or []
-            if schedule:
-                items = []
-                for item in schedule:
-                    if isinstance(item, dict):
-                        t = item.get("time", "")
-                        a = item.get("activity", "")
-                        if t and a:
-                            items.append(f"{t} {a}")
-                response = "Here is your plan for today: " + ", ".join(items) if items else "Here is your plan for today: check Today's Plan for the full timeline."
-            else:
-                response = "I don't have a saved schedule for today yet. Please open Today's Plan to generate or update your schedule."
+            items = []
+            for item in schedule:
+                if isinstance(item, dict):
+                    t = item.get("time", "")
+                    a = item.get("activity", "")
+                    if t and a:
+                        items.append(f"{t} {a}")
+            response = (
+                "Here is your plan for today: " + ", ".join(items)
+                if items else
+                "I don't have a saved schedule for today yet. Please open Today's Plan to generate or update it."
+            )
             if is_tamil:
                 response = "இதுதான் இன்று உங்கள் schedule. Today's Plan பகுதியில் முழு அட்டவணையை பார்க்கலாம்."
             tool_executed = "get_today_schedule"
 
-        elif any(term in msg_lower for term in ["hello", "hi", "healthy lifestyle", "want a healthy", "help me"]):
-            profession = context.get("profession", "college student")
-            response = (
-                f"Absolutely. For your {profession} lifestyle, I can help organize sleep, meals, workouts and study/work breaks. "
-                "A good starting point is regular sleep, balanced meals with enough protein and vegetables, hydration, "
-                "and consistent moderate exercise. Tell me your main goal—fitness, weight management, muscle gain, or better sleep—and I can tailor the plan."
-            )
-            if is_tamil:
-                response = "நிச்சயமாக. உங்கள் lifestyle-க்கு sleep, meals, workout மற்றும் study/work breaks ஆகியவற்றை திட்டமிட உதவுகிறேன். உங்கள் முக்கிய goal என்ன—fitness, weight management, muscle gain அல்லது better sleep?"
-        
         else:
-            response = (
-                "I can help with your daily schedule, workouts, nutrition, sleep and lifestyle goals. "
-                "Ask me a specific question such as 'What should I eat before a workout?' or 'How many workouts did I complete this week?'"
-            )
+            # Context-aware fallback: do not pretend that every unknown sentence is
+            # a health command. Ask a natural follow-up using the user's last turn.
+            if last_user:
+                response = (
+                    f"I understand. We were talking about “{last_user[:80]}”. "
+                    "Tell me what you'd like to do next, and I'll help."
+                )
+            else:
+                response = (
+                    f"I’m ready to help with your {profession} lifestyle. "
+                    "You can ask naturally about your schedule, workouts, food, sleep, goals, or general wellness."
+                )
             if is_tamil:
-                response = "உங்கள் schedule, workout, nutrition, sleep மற்றும் lifestyle goals பற்றி உதவ முடியும். ஒரு குறிப்பிட்ட கேள்வியை கேளுங்கள்."
+                response = "புரிகிறது. நீங்கள் என்ன செய்ய விரும்புகிறீர்கள் என்று சொல்லுங்கள்; உங்கள் schedule, workout, உணவு, sleep மற்றும் goals பற்றி உதவுகிறேன்."
 
         return {
             "response": response,
-            "source_type": "INTERNET_VERIFIED" if use_internet and is_current_guideline else "LOCAL_DATA",
+            "source_type": "INTERNET_VERIFIED" if tool_executed == "internet_verify" else "LOCAL_DATA",
             "tool_executed": tool_executed,
             "action_performed": action_performed,
             "citations": citations,
