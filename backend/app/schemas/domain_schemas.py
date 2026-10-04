@@ -153,6 +153,7 @@ class NutritionLogCreate(BaseModel):
 
 class FoodImageAnalyzeRequest(BaseModel):
     image_base64: str
+    mime_type: Optional[str] = "image/jpeg"
     meal_type: Optional[str] = "Lunch"
 
 class FoodAnalysisResponse(BaseModel):
