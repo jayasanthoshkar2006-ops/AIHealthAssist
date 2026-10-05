@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { useAuth } from '../store/AuthContext';
 import { apiRequest } from '../api/client';
 import { DisclaimerBanner } from '../components/common/DisclaimerBanner';
-import { Settings, Lock, Download, Trash2 } from 'lucide-react';
+import { Settings, Lock, Download, Upload, Trash2 } from 'lucide-react';
+import { clearLocalAccountData, exportLocalData, importLocalData, getLocalStorageEstimate } from '../storage/localDb';
 
 export const SettingsPage: React.FC = () => {
   const { logout } = useAuth();
   const [pin, setPin] = useState('');
   const [msg, setMsg] = useState('');
+  const [localStorageInfo, setLocalStorageInfo] = useState('Local IndexedDB storage is active.');
   const [appLockEnabled, setAppLockEnabled] = useState(
     localStorage.getItem('appLockEnabled') === 'true'
   );
@@ -30,15 +32,28 @@ export const SettingsPage: React.FC = () => {
 
   const handleExport = async () => {
     try {
-      const data = await apiRequest('/auth/export-data');
+      const data = await exportLocalData();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = 'personal_healthassist_export.json';
       a.click();
+      URL.revokeObjectURL(url);
+      setMsg('All locally stored application data was exported.');
     } catch (err: any) {
-      alert('Export failed');
+      alert(err.message || 'Local export failed');
+    }
+  };
+
+  const handleImport = async (file: File) => {
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text);
+      const count = await importLocalData(payload);
+      setMsg(count + ' local data records imported. Refresh the page to use restored data.');
+    } catch (err: any) {
+      alert(err.message || 'Import failed. Please select a valid HealthAssist backup.');
     }
   };
 
@@ -46,12 +61,23 @@ export const SettingsPage: React.FC = () => {
     if (window.confirm('Are you sure you want to permanently delete your account and all stored health data?')) {
       try {
         await apiRequest('/auth/delete-account', { method: 'DELETE' });
+        await clearLocalAccountData();
         logout();
       } catch (err: any) {
         alert('Account deletion failed');
       }
     }
   };
+
+  React.useEffect(() => {
+    getLocalStorageEstimate().then(({ usage, quota }) => {
+      if (usage && quota) {
+        const usedMb = (usage / 1024 / 1024).toFixed(1);
+        const quotaMb = (quota / 1024 / 1024).toFixed(0);
+        setLocalStorageInfo('Local IndexedDB storage: ' + usedMb + ' MB used of about ' + quotaMb + ' MB available.');
+      }
+    });
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -133,8 +159,22 @@ export const SettingsPage: React.FC = () => {
               onClick={handleExport}
               className="flex-1 px-4 py-3 rounded-2xl bg-slate-950 border border-slate-800 hover:border-sky-500 font-bold text-xs text-sky-400 flex items-center justify-center gap-2"
             >
-              <Download className="w-4 h-4" /> Export All Personal Data (JSON)
+              <Download className="w-4 h-4" /> Export All Local Personal Data (JSON)
             </button>
+
+            <label className="flex-1 px-4 py-3 rounded-2xl bg-slate-950 border border-slate-800 hover:border-emerald-500 font-bold text-xs text-emerald-400 flex items-center justify-center gap-2 cursor-pointer">
+              <Upload className="w-4 h-4" /> Import Local Backup
+              <input
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void handleImport(file);
+                  e.currentTarget.value = '';
+                }}
+              />
+            </label>
 
             <button
               onClick={handleDeleteAccount}
