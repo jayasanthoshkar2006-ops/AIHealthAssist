@@ -87,7 +87,8 @@ export const SettingsPage: React.FC = () => {
         <h2 className="font-extrabold text-lg text-slate-100 flex items-center gap-2">
           <Settings className="w-5 h-5 text-sky-400" /> Account Settings & Controls
         </h2>
-        <p className="text-xs text-slate-400">Security, PIN lock, data export, language preferences & account controls</p>
+        <p className="text-xs text-slate-400">Security, PIN lock, local data storage, backup & account controls</p>
+        <p className="text-[11px] text-emerald-400">✓ {localStorageInfo}</p>
       </div>
 
       {msg && (
