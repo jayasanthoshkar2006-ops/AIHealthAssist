@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import domain_models\nfrom app.models.domain_models import User, UserProfile, UserPreference
+from app.models import domain_models
+from app.models.domain_models import User, UserProfile, UserPreference
 from app.schemas.domain_schemas import UserRegister, UserLogin, TokenResponse, ChangePassword, SetPinCode, VerifyPinCode, PasswordResetRequest, PasswordResetConfirm
 from app.auth.security import get_password_hash, verify_password, create_access_token, decode_token
 from fastapi.security import OAuth2PasswordBearer
