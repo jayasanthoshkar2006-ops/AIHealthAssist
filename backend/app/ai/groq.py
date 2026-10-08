@@ -82,6 +82,67 @@ class GroqProvider(BaseAIProvider):
             and any(term in low for term in ["who", "guideline", "physical activity"])
         )
 
+    def _is_personal_data_request(self, message: str) -> bool:
+        low = message.lower()
+        personal_terms = [
+            "my ", "mine", "i have", "i did", "i completed", "i logged",
+            "schedule", "workout", "exercise", "journal", "mood", "medication",
+            "medicine", "appointment", "health record", "health records",
+            "goal", "goals", "streak", "notification", "sleep", "food",
+            "nutrition", "profile", "weight", "height", "profession",
+            "reminder", "report", "today's plan", "today plan",
+        ]
+        return any(term in low for term in personal_terms)
+
+    def _cloud_context_answer(self, message: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        safe_context = {
+            "profile": context.get("profile") or {},
+            "schedule": context.get("schedule") or {},
+            "today_schedule": context.get("today_schedule") or [],
+            "workouts_last_7_days": context.get("workouts_last_7_days") or [],
+            "weekly_workouts_count": context.get("weekly_workouts_count", 0),
+            "exercise_records": context.get("exercise_records") or [],
+            "journal_entries": context.get("journal_entries") or [],
+            "medications": context.get("medications") or [],
+            "appointments": context.get("appointments") or [],
+            "health_records": context.get("health_records") or [],
+            "goals": context.get("goals") or [],
+            "notifications": context.get("notifications") or [],
+            "sleep_records": context.get("sleep_records") or [],
+            "nutrition_logs": context.get("nutrition_logs") or [],
+            "environment": context.get("environment") or {},
+            "conversation_history": (context.get("conversation_history") or [])[-10:],
+        }
+        system = """You are HealthAssist AI with authorized read access to the authenticated user's
+HealthAssist cloud account. Answer personal-data questions from the supplied cloud snapshot.
+Never invent, merge, or substitute another user's information. Use exact records when available
+and clearly say when the requested data is empty or unavailable. You may summarize wellness data,
+but do not diagnose or prescribe. Medication information is for reminders/organization only.
+The application, not the model, performs database-changing actions. Answer in English only."""
+        prompt = (
+            f"AUTHENTICATED USER CLOUD DATA:
+{json.dumps(safe_context, ensure_ascii=False)}
+
+"
+            f"USER QUESTION:
+{message}"
+        )
+        answer = self._chat(
+            [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+            temperature=0.2,
+        )
+        return {
+            "response": answer,
+            "source_type": "CLOUD_DATA",
+            "tool_executed": "cloud_data_query",
+            "action_performed": None,
+            "citations": None,
+            "disclaimer": (
+                "This tool provides lifestyle and wellness organization. "
+                "It is not a substitute for professional medical advice."
+            ),
+        }
+
     def _verify_who_physical_activity(self, message: str) -> Dict[str, Any]:
         """Fetch the current official WHO physical-activity page, then ask Groq to summarize it."""
         page = requests.get(self.WHO_PHYSICAL_ACTIVITY_URL, timeout=20)
@@ -148,6 +209,12 @@ Mention that the information is from WHO and keep the answer concise."""
                 "source_type": "CLOUD_DATA",
             }
 
+        if self._is_cloud_data_tool(local_result) or self._is_personal_data_request(message):
+            try:
+                return self._cloud_context_answer(message, context)
+            except Exception:
+                pass
+
         # Current/official information is only labelled verified after a real
         # request to the official WHO page.
         if use_internet and self._is_current_info_request(message):
@@ -180,6 +247,16 @@ Mention that the information is from WHO and keep the answer concise."""
             "today_schedule": context.get("today_schedule"),
             "weekly_workouts_count": context.get("weekly_workouts_count", 0),
             "weekly_average_form_score": context.get("weekly_average_form_score", 0),
+            "workouts_last_7_days": context.get("workouts_last_7_days") or [],
+            "exercise_records": context.get("exercise_records") or [],
+            "journal_entries": context.get("journal_entries") or [],
+            "medications": context.get("medications") or [],
+            "appointments": context.get("appointments") or [],
+            "health_records": context.get("health_records") or [],
+            "goals": context.get("goals") or [],
+            "notifications": context.get("notifications") or [],
+            "sleep_records": context.get("sleep_records") or [],
+            "nutrition_logs": context.get("nutrition_logs") or [],
             "environment": context.get("environment"),
             "conversation_history": (context.get("conversation_history") or [])[-8:],
         }
