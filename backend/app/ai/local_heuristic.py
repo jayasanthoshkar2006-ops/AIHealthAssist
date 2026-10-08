@@ -101,25 +101,81 @@ class LocalHeuristicProvider(BaseAIProvider):
         }
 
     def adjust_schedule(self, current_schedule: List[Dict[str, Any]], user_command: str) -> List[Dict[str, Any]]:
-        cmd = user_command.lower()
-        updated = [dict(item) for item in current_schedule]
-        
-        if "evening" in cmd or "6" in cmd or "7" in cmd:
-            # Shift workout to evening 18:30 or 19:00
-            for item in updated:
-                if item.get("category") == "workout":
-                    item["time"] = "19:00"
-                    item["activity"] = "Adjusted Evening Workout Session"
-        elif "lighter" in cmd or "light" in cmd:
-            for item in updated:
-                if item.get("category") == "workout":
-                    item["activity"] = "Light Recovery Stretching & Mobility Workout (20 min)"
-                    item["duration_minutes"] = 20
-        elif "lunch" in cmd and "1:30" in cmd:
-            for item in updated:
-                if "Lunch" in item.get("activity", ""):
-                    item["time"] = "13:30"
+        """Apply explicit add, change, or delete schedule commands."""
+        import re
+        cmd = user_command.strip()
+        low = cmd.lower()
+        updated = [dict(item) for item in (current_schedule or [])]
 
+        def normalize_time(value: str) -> str:
+            value = value.strip().lower().replace(".", "")
+            m = re.search(r"(\d{1,2})(?::(\d{2}))?\s*(am|pm)?", value)
+            if not m:
+                return value
+            hour = int(m.group(1)); minute = int(m.group(2) or "00"); meridiem = m.group(3)
+            if meridiem == "pm" and hour < 12: hour += 12
+            elif meridiem == "am" and hour == 12: hour = 0
+            return f"{hour:02d}:{minute:02d}"
+
+        def infer_category(activity: str) -> str:
+            x = activity.lower()
+            if any(k in x for k in ["workout","exercise","gym","run","walk","yoga","training"]): return "workout"
+            if any(k in x for k in ["breakfast","lunch","dinner","meal","snack"]): return "meal"
+            if any(k in x for k in ["sleep","wake","bed"]): return "sleep"
+            if any(k in x for k in ["journal","meditat","mindfulness"]): return "journal"
+            if any(k in x for k in ["work","study","class","college"]): return "work"
+            return "personal"
+
+        add_match = re.search(r"\b(?:add|create|schedule)\b(?:\s+(?:a|an|the))?(?:\s+schedule)?\s+(.+?)\s+(?:at|@)\s+([0-9]{1,2}(?::[0-9]{2})?\s*(?:am|pm)?)", cmd, re.I)
+        if add_match:
+            activity=add_match.group(1).strip(" .")
+            time_value=normalize_time(add_match.group(2))
+            dm=re.search(r"(?:for|duration)\s+(\d+)\s*(?:min|mins|minutes)?",low)
+            updated.append({"time":time_value,"activity":activity,"category":infer_category(activity),"duration_minutes":int(dm.group(1)) if dm else 30})
+            return updated
+
+        if re.search(r"\b(delete|remove|cancel)\b", low):
+            target=re.sub(r"^.*?\b(delete|remove|cancel)\b","",low,count=1).strip()
+            target=re.sub(r"\b(my|the|schedule|event)\b"," ",target)
+            target=re.sub(r"\s+"," ",target).strip()
+            tm=re.search(r"([0-9]{1,2}(?::[0-9]{2})?\s*(?:am|pm))",target)
+            target_time=normalize_time(tm.group(1)) if tm else None
+            keywords=[x for x in re.findall(r"[a-z0-9]+",target) if x not in {"at","on"}]
+            removed=False; kept=[]
+            for item in updated:
+                activity=str(item.get("activity","")).lower()
+                item_time=normalize_time(str(item.get("time","")))
+                matches=(target_time is None or item_time==target_time) and (not keywords or all(k in activity for k in keywords))
+                if matches and not removed: removed=True; continue
+                kept.append(item)
+            return kept
+
+        change_match=re.search(r"\b(?:change|move|reschedule|shift|alter)\b(.+?)\s+(?:to|at|@)\s+([0-9]{1,2}(?::[0-9]{2})?\s*(?:am|pm)?)",cmd,re.I)
+        if change_match:
+            target=re.sub(r"\b(my|the|schedule|event|it)\b"," ",change_match.group(1),flags=re.I)
+            target=re.sub(r"\s+"," ",target).strip().lower()
+            new_time=normalize_time(change_match.group(2))
+            for item in updated:
+                activity=str(item.get("activity","")).lower()
+                if target in activity or (target in {"workout","exercise"} and item.get("category")=="workout"):
+                    item["time"]=new_time
+                    break
+            return updated
+
+        if "lighter" in low or "light" in low:
+            for item in updated:
+                if item.get("category")=="workout":
+                    item["activity"]="Light Recovery Stretching & Mobility Workout (20 min)"
+                    item["duration_minutes"]=20
+                    break
+        elif "evening" in low or "6" in low or "7" in low:
+            for item in updated:
+                if item.get("category")=="workout":
+                    item["time"]="19:00"; break
+        elif "lunch" in low and "1:30" in low:
+            for item in updated:
+                if "lunch" in str(item.get("activity","")).lower():
+                    item["time"]="13:30"; break
         return updated
 
     def predict_performance(self, exercise_name: str, history: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -301,14 +357,10 @@ class LocalHeuristicProvider(BaseAIProvider):
             or "exercise" in last_assistant.lower()
         )
 
-        is_move_workout = (
-            ("move" in msg_lower and ("workout" in msg_lower or refers_to_workout))
-            or ("reschedule" in msg_lower and ("workout" in msg_lower or refers_to_workout))
-            or ("change" in msg_lower and ("workout" in msg_lower or refers_to_workout))
-            or ("workout" in msg_lower and any(x in msg_lower for x in ["evening", "morning", "6 pm", "7 pm"]))
-            or ("move it" in msg_lower and refers_to_workout)
-            or "மாற்று" in message
-        )
+        is_schedule_add = any(x in msg_lower for x in ["add schedule", "add a schedule", "add to my schedule", "schedule a ", "create a schedule"])
+        is_schedule_delete = any(x in msg_lower for x in ["delete from my schedule", "delete schedule", "remove from my schedule", "remove schedule", "cancel from my schedule"])
+        is_schedule_change = (any(x in msg_lower for x in ["move", "change", "reschedule", "shift", "alter"]) and any(x in msg_lower for x in ["schedule", "workout", "lunch", "breakfast", "dinner", "sleep", "study", "work", "it"])) or "மாற்று" in message
+        is_move_workout = is_schedule_change or ("workout" in msg_lower and any(x in msg_lower for x in ["evening", "morning", "6 pm", "7 pm"]))
 
         is_current_guideline = (
             ("latest" in msg_lower or "current" in msg_lower or "official" in msg_lower)
@@ -398,6 +450,11 @@ class LocalHeuristicProvider(BaseAIProvider):
             response = "Sure. What would you like to do next?"
             if is_tamil:
                 response = "சரி. அடுத்து என்ன செய்ய விரும்புகிறீர்கள்?"
+
+        elif is_schedule_add or is_schedule_delete:
+            response = "Done. I updated your schedule."
+            tool_executed = "update_schedule"
+            action_performed = {"operation": "add" if is_schedule_add else "delete"}
 
         elif is_move_workout:
             new_time = "19:00"
