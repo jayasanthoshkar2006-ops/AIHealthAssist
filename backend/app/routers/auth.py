@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import domain_models\nfrom app.models.domain_models import User, UserProfile, UserPreference
-from app.schemas.domain_schemas import UserRegister, UserLogin, TokenResponse, ChangePassword, SetPinCode, VerifyPinCode
+from app.schemas.domain_schemas import UserRegister, UserLogin, TokenResponse, ChangePassword, SetPinCode, VerifyPinCode, PasswordResetRequest, PasswordResetConfirm
 from app.auth.security import get_password_hash, verify_password, create_access_token, decode_token
 from fastapi.security import OAuth2PasswordBearer
 from datetime import datetime, timedelta
@@ -93,7 +93,7 @@ def _send_password_reset_email(email: str, reset_url: str) -> None:
 
 
 @router.post("/password-reset/request")
-def request_password_reset(data: UserLogin, db: Session = Depends(get_db)):
+def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == data.email).first()
     # Keep the public response generic to avoid revealing whether an email is registered.
     if not user:
@@ -122,7 +122,9 @@ def request_password_reset(data: UserLogin, db: Session = Depends(get_db)):
 
 
 @router.post("/password-reset/confirm")
-def confirm_password_reset(token: str, new_password: str, db: Session = Depends(get_db)):
+def confirm_password_reset(data: PasswordResetConfirm, db: Session = Depends(get_db)):
+    token = data.token
+    new_password = data.new_password
     if len(new_password) < 6:
         raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
 
