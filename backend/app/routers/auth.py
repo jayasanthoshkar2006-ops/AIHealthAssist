@@ -77,7 +77,7 @@ def _send_email(message: EmailMessage) -> None:
         smtp.send_message(message)
 
 
-def _send_account_created_notification_email(email: str) -> None
+def _send_account_created_notification_email(email: str) -> None:
 
     message = EmailMessage()
     message["Subject"] = "HealthAssist AI - Account created successfully"
