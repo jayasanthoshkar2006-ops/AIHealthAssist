@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import domain_models
@@ -10,10 +10,12 @@ from datetime import datetime, timedelta
 import hashlib
 import secrets
 import smtplib
+import logging
 from email.message import EmailMessage
 from app.config import settings
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+logger = logging.getLogger(__name__)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
@@ -56,14 +58,45 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
         has_profile=False
     )
 
+def _send_login_notification_safely(email: str) -> None:
+    try:
+        _send_login_notification_email(email)
+        logger.info("Login notification email sent successfully")
+    except Exception:
+        logger.exception("Login notification email could not be sent")
+
+
+def _send_login_notification_email(email: str) -> None:
+    if not all([settings.SMTP_HOST, settings.SMTP_USERNAME, settings.SMTP_PASSWORD, settings.EMAIL_FROM]):
+        raise RuntimeError("Login notification email is not configured on the server")
+
+    message = EmailMessage()
+    message["Subject"] = "HealthAssist AI - New login detected"
+    message["From"] = settings.EMAIL_FROM
+    message["To"] = email
+    message.set_content(
+        "A successful login to your HealthAssist AI account was detected.\\n\\n"
+        f"Account: {email}\\n"
+        f"Time (server): {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC\\n\\n"
+        "If this was not you, reset your password immediately from the HealthAssist AI app.\\n\\n"
+        "HealthAssist AI"
+    )
+    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as smtp:
+        smtp.starttls()
+        smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+        smtp.send_message(message)
+
+
 @router.post("/login", response_model=TokenResponse)
-def login(data: UserLogin, db: Session = Depends(get_db)):
+def login(data: UserLogin, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == data.email).first()
     if not user or not verify_password(data.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Invalid email or password")
-    
+
     token = create_access_token(user.id)
     has_prof = user.profile is not None
+    background_tasks.add_task(_send_login_notification_safely, user.email)
+
     return TokenResponse(
         access_token=token,
         token_type="bearer",
