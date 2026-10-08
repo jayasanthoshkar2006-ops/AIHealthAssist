@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { apiRequest } from '../api/client';
 import { DisclaimerBanner } from '../components/common/DisclaimerBanner';
-import { Bot, Send, Mic, Sparkles, Globe, ShieldAlert, CheckCircle2, Link as LinkIcon } from 'lucide-react';
+import { Bot, Send, Mic, Sparkles, ShieldAlert, CheckCircle2, Link as LinkIcon } from 'lucide-react';
 
 export const AssistantPage: React.FC = () => {
   const [messages, setMessages] = useState<any[]>([
@@ -12,7 +12,6 @@ export const AssistantPage: React.FC = () => {
     }
   ]);
   const [input, setInput] = useState('');
-  const [useInternet, setUseInternet] = useState(false);
   const [language, setLanguage] = useState('en');
   const [loading, setLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -62,7 +61,7 @@ export const AssistantPage: React.FC = () => {
     try {
       const res: any = await apiRequest('/assistant/chat', {
         method: 'POST',
-        body: JSON.stringify({ message: currentInput, use_internet: useInternet, language })
+        body: JSON.stringify({ message: currentInput, use_internet: true, language })
       });
 
       setMessages((prev) => [
@@ -91,7 +90,7 @@ export const AssistantPage: React.FC = () => {
     { label: "இன்றைக்கு என்னுடைய schedule என்ன?", lang: "ta" },
     { label: "How many workouts did I complete this week?", lang: "en" },
     { label: "Move my workout to evening.", lang: "en" },
-    { label: "What is the latest official WHO nutrition guideline?", lang: "en", internet: true }
+    { label: "What is the latest official WHO nutrition guideline?", lang: "en" }
   ];
 
   return (
@@ -111,17 +110,6 @@ export const AssistantPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Internet Toggle */}
-          <button
-            onClick={() => setUseInternet(!useInternet)}
-            className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all ${
-              useInternet ? 'bg-sky-950 border-sky-500 text-sky-300' : 'bg-slate-950 border-slate-800 text-slate-400'
-            }`}
-          >
-            <Globe className="w-3.5 h-3.5" />
-            <span>Internet Verification: {useInternet ? 'ON' : 'OFF'}</span>
-          </button>
-
           {/* Language Toggle */}
           <button
             onClick={() => setLanguage(language === 'en' ? 'ta' : 'en')}
@@ -188,7 +176,6 @@ export const AssistantPage: React.FC = () => {
             key={idx}
             onClick={() => {
               setInput(chip.label);
-              if (chip.internet) setUseInternet(true);
             }}
             className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-sky-500 text-xs text-slate-300 transition-all"
           >
