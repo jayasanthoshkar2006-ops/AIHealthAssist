@@ -11,10 +11,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { SchedulePage } from './pages/SchedulePage';
 import { WorkoutPage } from './pages/WorkoutPage';
 import { LiveWorkoutPage } from './pages/LiveWorkoutPage';
-import { NutritionPage } from './pages/NutritionPage';
-import { SleepPage } from './pages/SleepPage';
 import { JournalPage } from './pages/JournalPage';
-import { GoalsPage } from './pages/GoalsPage';
 import { RemindersPage } from './pages/RemindersPage';
 import { HealthRecordsPage } from './pages/HealthRecordsPage';
 import { AssistantPage } from './pages/AssistantPage';
@@ -130,10 +127,7 @@ const ProtectedLayout: React.FC = () => {
             <Route path="/schedule" element={<SchedulePage />} />
             <Route path="/workout" element={<WorkoutPage />} />
             <Route path="/workout/live" element={<LiveWorkoutPage />} />
-            <Route path="/food" element={<NutritionPage />} />
-            <Route path="/sleep" element={<SleepPage />} />
             <Route path="/journal" element={<JournalPage />} />
-            <Route path="/goals" element={<GoalsPage />} />
             <Route path="/medications" element={<RemindersPage />} />
             <Route path="/health-records" element={<HealthRecordsPage />} />
             <Route path="/ai-assistant" element={<AssistantPage />} />
