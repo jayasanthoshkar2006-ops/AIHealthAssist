@@ -9,13 +9,10 @@ from app.routers import (
     onboarding,
     daily_plan,
     workouts,
-    nutrition,
-    sleep,
     journal,
     reminders,
     appointments,
     health,
-    goals,
     assistant,
     reports,
     dashboard
@@ -68,13 +65,10 @@ app.include_router(auth.router, prefix=v1_prefix)
 app.include_router(onboarding.router, prefix=v1_prefix)
 app.include_router(daily_plan.router, prefix=v1_prefix)
 app.include_router(workouts.router, prefix=v1_prefix)
-app.include_router(nutrition.router, prefix=v1_prefix)
-app.include_router(sleep.router, prefix=v1_prefix)
 app.include_router(journal.router, prefix=v1_prefix)
 app.include_router(reminders.router, prefix=v1_prefix)
 app.include_router(appointments.router, prefix=v1_prefix)
 app.include_router(health.router, prefix=v1_prefix)
-app.include_router(goals.router, prefix=v1_prefix)
 app.include_router(assistant.router, prefix=v1_prefix)
 app.include_router(reports.router, prefix=v1_prefix)
 app.include_router(dashboard.router, prefix=v1_prefix)
