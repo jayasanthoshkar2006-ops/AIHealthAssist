@@ -387,72 +387,13 @@ export const DashboardPage: React.FC = () => {
           }
           suffix={
             hasWorkoutData
-              ? `session${
-                  (metrics.workouts_completed ?? 2) === 1
-                    ? ''
-                    : 's'
-                }`
+              ? `session${(metrics.workouts_completed ?? 2) === 1 ? '' : 's'}`
               : ''
           }
           footer={
             hasWorkoutData
-              ? `Form: ${
-                  metrics.avg_form_score ?? (isDemo ? 95 : 'Not measured')
-                }${
-                  metrics.avg_form_score != null || isDemo
-                    ? '%'
-                    : ''
-                }`
+              ? `Form: ${metrics.avg_form_score ?? (isDemo ? 95 : 'Not measured')}${metrics.avg_form_score != null || isDemo ? '%' : ''}`
               : 'Complete a workout to start tracking'
-          }
-        />
-
-        <MetricCard
-          icon={<Utensils className="w-5 h-5" />}
-          title="Nutrition Today"
-          value={
-            hasNutritionData
-              ? `${Math.round(metrics.today_calories ?? (isDemo ? 2180 : 0))}`
-              : 'No data'
-          }
-          suffix={hasNutritionData ? 'kcal' : ''}
-          footer={
-            hasNutritionData
-              ? `Protein: ${Math.round(
-                  metrics.today_protein_g ?? (isDemo ? 96 : 0)
-                )}g`
-              : 'Record a meal to start tracking'
-          }
-        />
-
-        <MetricCard
-          icon={<Moon className="w-5 h-5" />}
-          title="Sleep Routine"
-          value={
-            hasSleepData
-              ? `${metrics.sleep_duration_hours ?? (isDemo ? 7.6 : 0)}`
-              : 'No data'
-          }
-          suffix={hasSleepData ? 'hrs' : ''}
-          footer={
-            hasSleepData
-              ? `Quality: ${
-                  metrics.sleep_quality_score ??
-                  (isDemo ? 92 : 'Not measured')
-                }/10`
-              : 'Record sleep to start tracking'
-          }
-        />
-
-        <MetricCard
-          icon={<Zap className="w-5 h-5" />}
-          title="Consistency"
-          value={`${metrics.streak_days ?? (isDemo ? 12 : 0)}`}
-          suffix="days"
-          footer={
-            (metrics.streak_days ?? (isDemo ? 12 : 0)) > 0
-              ? 'Active milestone streak'
-              : 'Your streak starts with activity'
           }
         />
 
