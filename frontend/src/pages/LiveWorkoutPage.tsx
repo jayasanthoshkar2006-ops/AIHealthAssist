@@ -296,7 +296,7 @@ export const LiveWorkoutPage: React.FC = () => {
           stageRef.current = 'up';
           repRef.current = Math.min(targetReps, repRef.current + 1);
           setRepCount(repRef.current);
-          if (repRef.current >= targetReps && !autoAdvanceRef.current) {
+          if (repRef.current >= targetReps && !autoAdvanceRef.current && !videoMode) {
             autoAdvanceRef.current = true;
             const currentIndex = planExercises.findIndex(e => e.name === selectedExercise);
             const nextExercise = currentIndex >= 0 && currentIndex < planExercises.length - 1
