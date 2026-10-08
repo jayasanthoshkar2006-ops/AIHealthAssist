@@ -1,6 +1,5 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard,
   Bot,
@@ -16,20 +15,18 @@ import {
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
-  const { t } = useTranslation();
-
   const navItems = [
-    { to: '/dashboard', label: t('dashboard'), icon: LayoutDashboard },
-    { to: '/ai-assistant', label: t('aiAssistant'), icon: Bot },
-    { to: '/schedule', label: t('dailyPlan'), icon: Calendar },
-    { to: '/workout', label: t('workout'), icon: Dumbbell },
-    { to: '/workout/live', label: t('liveWorkout'), icon: Video, highlight: true },
-    { to: '/journal', label: t('journal'), icon: BookOpen },
-    { to: '/medications', label: t('reminders'), icon: Pill },
-    { to: '/health-records', label: t('healthRecords'), icon: FileText },
-    { to: '/reports', label: t('reports'), icon: PieChart },
-    { to: '/settings', label: t('settings'), icon: Settings },
-    { to: '/privacy', label: t('privacy'), icon: ShieldCheck },
+    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { to: '/ai-assistant', label: 'AI Assistant', icon: Bot },
+    { to: '/schedule', label: "Today's Plan", icon: Calendar },
+    { to: '/workout', label: 'AI Workout', icon: Dumbbell },
+    { to: '/workout/live', label: 'Live Pose Coach', icon: Video, highlight: true },
+    { to: '/journal', label: 'Wellness Journal', icon: BookOpen },
+    { to: '/medications', label: 'Medications & Appointments', icon: Pill },
+    { to: '/health-records', label: 'Health Records', icon: FileText },
+    { to: '/reports', label: 'Wellness Reports', icon: PieChart },
+    { to: '/settings', label: 'Settings', icon: Settings },
+    { to: '/privacy', label: 'Privacy Policy', icon: ShieldCheck },
   ];
 
   return (
@@ -48,7 +45,7 @@ export const Sidebar: React.FC = () => {
                     : item.highlight
                     ? 'text-emerald-400 hover:bg-slate-800/80 bg-emerald-950/20 border border-emerald-500/20'
                     : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
-                }`
+                }`}
               }
             >
               <Icon className="w-4 h-4" />
@@ -65,9 +62,9 @@ export const Sidebar: React.FC = () => {
 
       <div className="p-4 border-t border-slate-800/80">
         <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-slate-400 space-y-1">
-          <p className="font-semibold text-slate-300">Offline & Privacy Ready</p>
+          <p className="font-semibold text-slate-300">Cloud Data & Privacy</p>
           <p className="text-slate-500 text-[10px]">
-            Personal data stored on local instance. Encrypted transport layer.
+            Personal data is protected by authenticated server access and encrypted transport.
           </p>
         </div>
       </div>
