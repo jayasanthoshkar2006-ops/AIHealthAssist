@@ -50,6 +50,7 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
     db.commit()
 
     token = create_access_token(user.id)
+    _send_account_created_notification_safely(user.email)
     return TokenResponse(
         access_token=token,
         token_type="bearer",
@@ -57,6 +58,34 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
         email=user.email,
         has_profile=False
     )
+
+def _send_account_created_notification_safely(email: str) -> None:
+    try:
+        _send_account_created_notification_email(email)
+        logger.info("Account creation notification email sent successfully")
+    except Exception:
+        logger.exception("Account creation notification email could not be sent")
+
+
+def _send_account_created_notification_email(email: str) -> None:
+    if not all([settings.SMTP_HOST, settings.SMTP_USERNAME, settings.SMTP_PASSWORD, settings.EMAIL_FROM]):
+        raise RuntimeError("Account creation email is not configured on the server")
+
+    message = EmailMessage()
+    message["Subject"] = "HealthAssist AI - Account created successfully"
+    message["From"] = settings.EMAIL_FROM
+    message["To"] = email
+    message.set_content(
+        "Your HealthAssist AI account was created successfully.\\n\\n"
+        f"Account: {email}\\n"
+        f"Time (server): {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC\\n\\n"
+        "HealthAssist AI"
+    )
+    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as smtp:
+        smtp.starttls()
+        smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+        smtp.send_message(message)
+
 
 def _send_login_notification_safely(email: str) -> None:
     try:
@@ -186,7 +215,32 @@ def confirm_password_reset(data: PasswordResetConfirm, db: Session = Depends(get
         domain_models.PasswordResetToken.used_at.is_(None),
     ).update({"used_at": datetime.utcnow()}, synchronize_session=False)
     db.commit()
+    try:
+        _send_password_changed_notification_email(user.email)
+    except Exception:
+        logger.exception("Password changed notification email could not be sent")
     return {"message": "Password reset successfully. You can now sign in with your new password."}
+
+
+def _send_password_changed_notification_email(email: str) -> None:
+    if not all([settings.SMTP_HOST, settings.SMTP_USERNAME, settings.SMTP_PASSWORD, settings.EMAIL_FROM]):
+        raise RuntimeError("Password change notification email is not configured on the server")
+
+    message = EmailMessage()
+    message["Subject"] = "HealthAssist AI - Password changed"
+    message["From"] = settings.EMAIL_FROM
+    message["To"] = email
+    message.set_content(
+        "Your HealthAssist AI password was changed successfully.\\n\\n"
+        f"Account: {email}\\n"
+        f"Time (server): {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC\\n\\n"
+        "If you did not make this change, reset your password again immediately.\\n\\n"
+        "HealthAssist AI"
+    )
+    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as smtp:
+        smtp.starttls()
+        smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+        smtp.send_message(message)
 
 
 @router.post("/change-password")
