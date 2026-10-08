@@ -23,7 +23,6 @@ export const OnboardingPage: React.FC = () => {
     gender: '',
     height: '',
     weight: '',
-    preferred_language: 'en',
     profession: '',
     wake_time: '06:30',
     sleep_time: '23:00',
@@ -96,6 +95,7 @@ export const OnboardingPage: React.FC = () => {
     try {
       const onboardingData = {
         ...formData,
+        preferred_language: 'en',
         age: Number(formData.age),
         height: Number(formData.height),
         weight: Number(formData.weight),
