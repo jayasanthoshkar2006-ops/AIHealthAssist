@@ -182,7 +182,7 @@ def chat_with_assistant(
         message=data.message,
         context=context,
         use_internet=data.use_internet,
-        language=data.language,
+        language="en",
     )
 
     # Persist schedule-changing assistant commands instead of merely returning
@@ -221,16 +221,10 @@ def chat_with_assistant(
                 if isinstance(item, dict) and item.get("category") == "workout":
                     saved_time = item.get("time")
                     if saved_time:
-                        if data.language != "ta":
-                            res["response"] = (
-                                f"Done. I moved your workout to {_format_time(saved_time)}. "
-                                "Your Today's Plan has been updated."
-                            )
-                        else:
-                            res["response"] = (
-                                f"சரி. உங்கள் workout {_format_time(saved_time)}க்கு மாற்றப்பட்டுள்ளது. "
-                                "Today's Plan புதுப்பிக்கப்பட்டது."
-                            )
+                        res["response"] = (
+                            f"Done. I moved your workout to {_format_time(saved_time)}. "
+                            "Your Today's Plan has been updated."
+                        )
                         break
 
     # Store tool/action metadata with the assistant message as well.
