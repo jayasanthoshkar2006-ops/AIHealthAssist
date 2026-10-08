@@ -29,7 +29,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     return user
 
 @router.post("/register", response_model=TokenResponse)
-def register(data: UserRegister, db: Session = Depends(get_db)):
+def register(data: UserRegister, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.email == data.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -50,7 +50,7 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
     db.commit()
 
     token = create_access_token(user.id)
-    _send_account_created_notification_safely(user.email)
+    background_tasks.add_task(_send_account_created_notification_safely, user.email)
     return TokenResponse(
         access_token=token,
         token_type="bearer",
