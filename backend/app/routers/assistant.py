@@ -216,16 +216,33 @@ def chat_with_assistant(
                 "plan_date": str(today),
             }
 
-            # Keep the response tied to the persisted timeline.
-            for item in updated_timeline:
-                if isinstance(item, dict) and item.get("category") == "workout":
-                    saved_time = item.get("time")
-                    if saved_time:
-                        res["response"] = (
-                            f"Done. I moved your workout to {_format_time(saved_time)}. "
-                            "Your Today's Plan has been updated."
-                        )
-                        break
+            # Keep the response tied to the persisted timeline without confusing
+            # an added workout with an existing workout.
+            operation = (res.get("action_performed") or {}).get("operation")
+            if operation == "add":
+                added_time = None
+                added_activity = None
+                if updated_timeline:
+                    before_keys = {(str(i.get("time")), str(i.get("activity"))) for i in current_timeline if isinstance(i, dict)}
+                    for item in updated_timeline:
+                        if isinstance(item, dict) and (str(item.get("time")), str(item.get("activity"))) not in before_keys:
+                            added_time = item.get("time")
+                            added_activity = item.get("activity")
+                            break
+                if added_time:
+                    res["response"] = (
+                        f"Done. I added {added_activity or 'the activity'} at {_format_time(added_time)}. "
+                        "Your Today's Plan has been updated."
+                    )
+            elif operation == "delete":
+                res["response"] = "Done. I removed that item from your schedule. Your Today's Plan has been updated."
+            else:
+                saved_time = (res.get("action_performed") or {}).get("new_workout_time")
+                if saved_time:
+                    res["response"] = (
+                        f"Done. I moved your workout to {_format_time(saved_time)}. "
+                        "Your Today's Plan has been updated."
+                    )
 
     # Store tool/action metadata with the assistant message as well.
     ai_msg = ChatMessage(
