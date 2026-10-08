@@ -9,11 +9,10 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./healthassist.db")
 
-    # Email security notifications
-    SMTP_HOST: str = os.getenv("SMTP_HOST", "")
-    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
-    SMTP_USERNAME: str = os.getenv("SMTP_USERNAME", "")
-    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    # Email security notifications (Gmail API over HTTPS)
+    GMAIL_CLIENT_ID: str = os.getenv("GMAIL_CLIENT_ID", "")
+    GMAIL_CLIENT_SECRET: str = os.getenv("GMAIL_CLIENT_SECRET", "")
+    GMAIL_REFRESH_TOKEN: str = os.getenv("GMAIL_REFRESH_TOKEN", "")
     EMAIL_FROM: str = os.getenv("EMAIL_FROM", "")
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "https://jayasanthoshkar2006-ops.github.io/AIHealthAssist/")
 
