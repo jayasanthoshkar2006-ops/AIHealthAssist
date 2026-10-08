@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FilesetResolver, PoseLandmarker, type NormalizedLandmark } from '@mediapipe/tasks-vision';
 import { apiRequest } from '../api/client';
 import { DisclaimerBanner } from '../components/common/DisclaimerBanner';
-import { Video, Play, Square, Volume2, Sparkles, AlertTriangle, RotateCcw } from 'lucide-react';
+import { Video, Play, Square, Volume2, Sparkles, AlertTriangle, RotateCcw, Upload, Film } from 'lucide-react';
 
 type Landmark = NormalizedLandmark;
 
@@ -170,6 +170,10 @@ export const LiveWorkoutPage: React.FC = () => {
   const [modelReady, setModelReady] = useState(false);
   const [suggested, setSuggested] = useState<ExerciseConfig[]>([]);
   const [sessionSeconds, setSessionSeconds] = useState(0);
+  const [videoAnalyzing, setVideoAnalyzing] = useState(false);
+  const [videoProgress, setVideoProgress] = useState(0);
+  const [videoResult, setVideoResult] = useState<{ reps: number; formScore: number; duration: number; exercise: string } | null>(null);
+  const videoInputRef = useRef<HTMLInputElement | null>(null);
 
   const exercise = EXERCISES.find(e => e.name === selectedExercise) || EXERCISES[0];
   const planExercises = suggested.length ? suggested : [exercise];
@@ -410,6 +414,105 @@ export const LiveWorkoutPage: React.FC = () => {
     lastSpokenRef.current = '';
   };
 
+  const analyzeUploadedVideo = useCallback(async (file: File) => {
+    if (!file.type.startsWith('video/')) {
+      setCameraError('Please select a video file.');
+      return;
+    }
+    if (!poseRef.current || !modelReady) {
+      await loadPoseModel();
+    }
+    if (!poseRef.current) {
+      setCameraError('AI pose model is not ready. Please try again.');
+      return;
+    }
+
+    setVideoAnalyzing(true);
+    setVideoProgress(0);
+    setVideoResult(null);
+    setCameraError('');
+    try {
+      const url = URL.createObjectURL(file);
+      const video = document.createElement('video');
+      video.preload = 'auto';
+      video.muted = true;
+      video.playsInline = true;
+      video.src = url;
+
+      await new Promise<void>((resolve, reject) => {
+        video.onloadedmetadata = () => resolve();
+        video.onerror = () => reject(new Error('The selected video could not be loaded.'));
+      });
+
+      const duration = Number.isFinite(video.duration) ? video.duration : 0;
+      if (!duration) throw new Error('The selected video has no readable duration.');
+
+      let stage = 'up';
+      let reps = 0;
+      let validFrames = 0;
+      let formTotal = 0;
+      let lastTimestamp = -1;
+      const sampleEvery = 0.10;
+
+      const processAt = async (time: number) => {
+        video.currentTime = Math.min(time, duration);
+        await new Promise<void>(resolve => {
+          const done = () => resolve();
+          video.addEventListener('seeked', done, { once: true });
+        });
+
+        const timestamp = Math.max(0, time * 1000);
+        if (timestamp <= lastTimestamp) return;
+        lastTimestamp = timestamp;
+
+        const result = poseRef.current!.detectForVideo(video, timestamp);
+        const points = result.landmarks?.[0];
+        if (!points) return;
+
+        const measurement = exerciseMeasurement(selectedExercise, points);
+        const form = formFeedback(selectedExercise, points, measurement);
+        const visibility = avgVisibility(points, [11, 12, 23, 24, 25, 26, 27, 28]);
+
+        if (visibility >= 0.65 && form.score >= 65) {
+          validFrames += 1;
+          formTotal += form.score;
+          const nextStage = exerciseState(selectedExercise, measurement, stage);
+          if (nextStage === 'down' && stage === 'up') {
+            stage = 'down';
+          } else if (nextStage === 'up' && stage === 'down') {
+            stage = 'up';
+            reps += 1;
+          }
+        }
+      };
+
+      for (let time = 0; time <= duration; time += sampleEvery) {
+        await processAt(time);
+        setVideoProgress(Math.min(100, Math.round((time / duration) * 100)));
+      }
+
+      const avgForm = validFrames ? Math.round(formTotal / validFrames) : 0;
+      setVideoResult({
+        reps,
+        formScore: avgForm,
+        duration: Math.round(duration),
+        exercise: selectedExercise,
+      });
+      setFeedback(
+        reps > 0
+          ? 'Video analysis complete: ' + reps + ' valid ' + selectedExercise + ' repetitions detected.'
+          : 'Video analysis complete: no valid ' + selectedExercise + ' repetitions detected.'
+      );
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      setCameraError(err instanceof Error ? err.message : 'Video analysis failed. Try another video.');
+    } finally {
+      setVideoAnalyzing(false);
+      setVideoProgress(100);
+    }
+  }, [loadPoseModel, modelReady, selectedExercise]);
+
   const minutes = Math.floor(sessionSeconds / 60);
   const seconds = sessionSeconds % 60;
 
@@ -455,6 +558,66 @@ export const LiveWorkoutPage: React.FC = () => {
             )}
           </div>
         </div>
+      </div>
+
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h3 className="font-bold text-sm text-slate-100 flex items-center gap-2">
+              <Film className="w-4 h-4 text-violet-400" /> Upload Video Exercise Counter
+            </h3>
+            <p className="text-xs text-slate-400 mt-1">
+              Upload a workout video and MediaPipe will analyze the selected exercise locally in your browser.
+            </p>
+          </div>
+          <input
+            ref={videoInputRef}
+            type="file"
+            accept="video/*"
+            className="hidden"
+            onChange={e => {
+              const file = e.target.files?.[0];
+              if (file) void analyzeUploadedVideo(file);
+              e.currentTarget.value = '';
+            }}
+          />
+          <button
+            onClick={() => videoInputRef.current?.click()}
+            disabled={videoAnalyzing || modelLoading}
+            className="px-5 py-2.5 rounded-xl bg-violet-500 hover:bg-violet-400 text-white text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            <Upload className="w-4 h-4" />
+            {videoAnalyzing ? 'Analyzing ' + videoProgress + '%' : 'Upload Video & Count'}
+          </button>
+        </div>
+        {videoAnalyzing && (
+          <div className="mt-4 h-2 rounded-full bg-slate-800 overflow-hidden">
+            <div className="h-full bg-violet-400 transition-all" style={{ width: videoProgress + '%' }} />
+          </div>
+        )}
+        {videoResult && !videoAnalyzing && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-center">
+              <p className="text-[10px] text-slate-500">Exercise</p>
+              <strong className="block text-slate-200 mt-1 text-xs">{videoResult.exercise}</strong>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-center">
+              <p className="text-[10px] text-slate-500">Valid Reps</p>
+              <strong className="block text-sky-400 mt-1 text-xl">{videoResult.reps}</strong>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-center">
+              <p className="text-[10px] text-slate-500">Avg Form</p>
+              <strong className="block text-emerald-400 mt-1 text-xl">{videoResult.formScore ? videoResult.formScore + '%' : '—'}</strong>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-center">
+              <p className="text-[10px] text-slate-500">Video</p>
+              <strong className="block text-slate-200 mt-1 text-xs">{videoResult.duration}s</strong>
+            </div>
+          </div>
+        )}
+        <p className="text-[10px] text-slate-500 mt-3">
+          Privacy: the uploaded video is processed in this browser and is not uploaded to the HealthAssist server.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
