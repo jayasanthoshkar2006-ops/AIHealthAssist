@@ -190,7 +190,7 @@ export const SettingsPage: React.FC = () => {
           </button>
         </div>
 
-        {/* Data Ownership & Account Controls */
+        {/* Data Ownership & Account Controls */}
         <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
           <h3 className="font-bold text-sm text-slate-100">Data Ownership & Privacy Export</h3>
 
