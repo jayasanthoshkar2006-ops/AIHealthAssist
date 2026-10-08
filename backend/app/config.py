@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     SMTP_USERNAME: str = os.getenv("SMTP_USERNAME", "")
     SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
     EMAIL_FROM: str = os.getenv("EMAIL_FROM", "")
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "https://jayasanthoshkar2006-ops.github.io/AIHealthAssist/")
 
     # Auth
     JWT_SECRET: str = os.getenv("JWT_SECRET", "super-secret-key-change-in-production-32bytes-min")
