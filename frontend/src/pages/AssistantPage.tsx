@@ -88,7 +88,7 @@ export const AssistantPage: React.FC = () => {
     { label: "What is my schedule today?", lang: "en" },
     { label: "How many workouts did I complete this week?", lang: "en" },
     { label: "Move my workout to evening.", lang: "en" },
-    { label: "What is the latest official WHO nutrition guideline?" }
+    { label: "What is the latest official WHO physical activity guideline?" }
   ];
 
   return (
