@@ -67,9 +67,17 @@ def _send_account_created_notification_safely(email: str) -> None:
         logger.exception("Account creation notification email could not be sent")
 
 
-def _send_account_created_notification_email(email: str) -> None:
+def _send_email(message: EmailMessage) -> None:
+    """Send mail through the single server-side sender configured on Render."""
     if not all([settings.SMTP_HOST, settings.SMTP_USERNAME, settings.SMTP_PASSWORD, settings.EMAIL_FROM]):
-        raise RuntimeError("Account creation email is not configured on the server")
+        raise RuntimeError("Server email sender is not configured")
+    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as smtp:
+        smtp.starttls()
+        smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+        smtp.send_message(message)
+
+
+def _send_account_created_notification_email(email: str) -> None
 
     message = EmailMessage()
     message["Subject"] = "HealthAssist AI - Account created successfully"
@@ -81,10 +89,7 @@ def _send_account_created_notification_email(email: str) -> None:
         f"Time (server): {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC\\n\\n"
         "HealthAssist AI"
     )
-    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as smtp:
-        smtp.starttls()
-        smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
-        smtp.send_message(message)
+    _send_email(message)
 
 
 def _send_login_notification_safely(email: str) -> None:
@@ -110,10 +115,7 @@ def _send_login_notification_email(email: str) -> None:
         "If this was not you, reset your password immediately from the HealthAssist AI app.\\n\\n"
         "HealthAssist AI"
     )
-    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as smtp:
-        smtp.starttls()
-        smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
-        smtp.send_message(message)
+    _send_email(message)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -149,10 +151,7 @@ def _send_password_reset_email(email: str, reset_url: str) -> None:
         "If you did not request this, you can safely ignore this email.\\n\\n"
         "HealthAssist AI"
     )
-    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as smtp:
-        smtp.starttls()
-        smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
-        smtp.send_message(message)
+    _send_email(message)
 
 
 @router.post("/password-reset/request")
@@ -222,6 +221,14 @@ def confirm_password_reset(data: PasswordResetConfirm, db: Session = Depends(get
     return {"message": "Password reset successfully. You can now sign in with your new password."}
 
 
+def _send_password_changed_notification_safely(email: str) -> None:
+    try:
+        _send_password_changed_notification_email(email)
+        logger.info("Password changed notification email sent successfully")
+    except Exception:
+        logger.exception("Password changed notification email could not be sent")
+
+
 def _send_password_changed_notification_email(email: str) -> None:
     if not all([settings.SMTP_HOST, settings.SMTP_USERNAME, settings.SMTP_PASSWORD, settings.EMAIL_FROM]):
         raise RuntimeError("Password change notification email is not configured on the server")
@@ -237,18 +244,16 @@ def _send_password_changed_notification_email(email: str) -> None:
         "If you did not make this change, reset your password again immediately.\\n\\n"
         "HealthAssist AI"
     )
-    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as smtp:
-        smtp.starttls()
-        smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
-        smtp.send_message(message)
+    _send_email(message)
 
 
 @router.post("/change-password")
-def change_password(data: ChangePassword, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def change_password(data: ChangePassword, background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if not verify_password(data.old_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect current password")
     current_user.hashed_password = get_password_hash(data.new_password)
     db.commit()
+    background_tasks.add_task(_send_password_changed_notification_safely, current_user.email)
     return {"message": "Password updated successfully"}
 
 @router.post("/pin/set")
