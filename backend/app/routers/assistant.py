@@ -13,9 +13,6 @@ from app.models.domain_models import (
     Workout,
     ChatMessage,
     DailyPlan,
-    Goal,
-    NutritionLog,
-    SleepRecord,
     EnvironmentResource,
 )
 from app.schemas.domain_schemas import ChatRequest, ChatResponse
@@ -94,30 +91,6 @@ def chat_with_assistant(
         .first()
     )
 
-    goals = (
-        db.query(Goal)
-        .filter(Goal.user_id == current_user.id, Goal.is_completed == False)
-        .order_by(Goal.created_at.desc())
-        .limit(10)
-        .all()
-    )
-
-    recent_nutrition = (
-        db.query(NutritionLog)
-        .filter(NutritionLog.user_id == current_user.id)
-        .order_by(NutritionLog.created_at.desc())
-        .limit(10)
-        .all()
-    )
-
-    recent_sleep = (
-        db.query(SleepRecord)
-        .filter(SleepRecord.user_id == current_user.id)
-        .order_by(SleepRecord.sleep_date.desc())
-        .limit(7)
-        .all()
-    )
-
     resources = (
         db.query(EnvironmentResource)
         .filter(EnvironmentResource.user_id == current_user.id)
@@ -163,43 +136,12 @@ def chat_with_assistant(
         if workouts else 0
     )
 
-    nutrition_summary = [
-        {
-            "date": str(n.log_date),
-            "meal_type": n.meal_type,
-            "food": n.food_name,
-            "calories": n.calories,
-            "protein_g": n.protein_g,
-        }
-        for n in recent_nutrition
-    ]
-
-    sleep_summary = [
-        {
-            "date": str(s.sleep_date),
-            "duration_hours": s.duration_hours,
-            "quality_score": s.quality_score,
-        }
-        for s in recent_sleep
-    ]
-
     context = {
         **profile_dict,
         "weekly_workouts_count": len(workouts),
         "weekly_average_form_score": workout_average_form,
         "today_schedule": today_schedule or [],
         "schedule": schedule_dict,
-        "goals": [
-            {
-                "title": g.title,
-                "category": g.category,
-                "target": g.target_value,
-                "current": g.current_value,
-            }
-            for g in goals
-        ],
-        "nutrition_recent": nutrition_summary,
-        "sleep_recent": sleep_summary,
         "environment": {
             "equipment": resources.equipment_list if resources else [],
             "pantry_foods": resources.pantry_foods if resources else [],
