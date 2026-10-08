@@ -2,14 +2,12 @@ import React, { useState } from 'react';
 import { useAuth } from '../store/AuthContext';
 import { apiRequest } from '../api/client';
 import { DisclaimerBanner } from '../components/common/DisclaimerBanner';
-import { Settings, Lock, Download, Upload, Trash2, KeyRound, Mail } from 'lucide-react';
-import { clearLocalAccountData, exportLocalData, importLocalData, getLocalStorageEstimate } from '../storage/localDb';
+import { Settings, Lock, Download, Trash2, KeyRound, Mail } from 'lucide-react';
 
 export const SettingsPage: React.FC = () => {
   const { logout, userEmail } = useAuth();
   const [pin, setPin] = useState('');
   const [msg, setMsg] = useState('');
-  const [localStorageInfo, setLocalStorageInfo] = useState('Local IndexedDB storage is active.');
   const [appLockEnabled, setAppLockEnabled] = useState(
     localStorage.getItem('appLockEnabled') === 'true'
   );
@@ -49,28 +47,17 @@ export const SettingsPage: React.FC = () => {
 
   const handleExport = async () => {
     try {
-      const data = await exportLocalData();
+      const data = await apiRequest<Record<string, unknown>>('/auth/export-data');
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'personal_healthassist_export.json';
+      a.download = 'healthassist-cloud-data-export.json';
       a.click();
       URL.revokeObjectURL(url);
-      setMsg('All locally stored application data was exported.');
+      setMsg('Your cloud account data was exported successfully.');
     } catch (err: any) {
-      alert(err.message || 'Local export failed');
-    }
-  };
-
-  const handleImport = async (file: File) => {
-    try {
-      const text = await file.text();
-      const payload = JSON.parse(text);
-      const count = await importLocalData(payload);
-      setMsg(count + ' local data records imported. Refresh the page to use restored data.');
-    } catch (err: any) {
-      alert(err.message || 'Import failed. Please select a valid HealthAssist backup.');
+      alert(err.message || 'Cloud data export failed');
     }
   };
 
@@ -78,7 +65,6 @@ export const SettingsPage: React.FC = () => {
     if (window.confirm('Are you sure you want to permanently delete your account and all stored health data?')) {
       try {
         await apiRequest('/auth/delete-account', { method: 'DELETE' });
-        await clearLocalAccountData();
         logout();
       } catch (err: any) {
         alert('Account deletion failed');
@@ -86,15 +72,6 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  React.useEffect(() => {
-    getLocalStorageEstimate().then(({ usage, quota }) => {
-      if (usage && quota) {
-        const usedMb = (usage / 1024 / 1024).toFixed(1);
-        const quotaMb = (quota / 1024 / 1024).toFixed(0);
-        setLocalStorageInfo('Local IndexedDB storage: ' + usedMb + ' MB used of about ' + quotaMb + ' MB available.');
-      }
-    });
-  }, []);
 
   return (
     <div className="space-y-6">
@@ -104,8 +81,8 @@ export const SettingsPage: React.FC = () => {
         <h2 className="font-extrabold text-lg text-slate-100 flex items-center gap-2">
           <Settings className="w-5 h-5 text-sky-400" /> Account Settings & Controls
         </h2>
-        <p className="text-xs text-slate-400">Security, PIN lock, local data storage, backup & account controls</p>
-        <p className="text-[11px] text-emerald-400">✓ {localStorageInfo}</p>
+        <p className="text-xs text-slate-400">Cloud account security, PIN lock, data export & account controls</p>
+        <p className="text-[11px] text-emerald-400">✓ Your personal HealthAssist data is stored in your authenticated cloud account.</p>
       </div>
 
       {msg && (
@@ -192,29 +169,15 @@ export const SettingsPage: React.FC = () => {
 
         {/* Data Ownership & Account Controls */}
         <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
-          <h3 className="font-bold text-sm text-slate-100">Data Ownership & Privacy Export</h3>
+          <h3 className="font-bold text-sm text-slate-100">Data Ownership & Cloud Privacy</h3>
 
           <div className="flex flex-col sm:flex-row gap-4">
             <button
               onClick={handleExport}
               className="flex-1 px-4 py-3 rounded-2xl bg-slate-950 border border-slate-800 hover:border-sky-500 font-bold text-xs text-sky-400 flex items-center justify-center gap-2"
             >
-              <Download className="w-4 h-4" /> Export All Local Personal Data (JSON)
+              <Download className="w-4 h-4" /> Export Cloud Personal Data (JSON)
             </button>
-
-            <label className="flex-1 px-4 py-3 rounded-2xl bg-slate-950 border border-slate-800 hover:border-emerald-500 font-bold text-xs text-emerald-400 flex items-center justify-center gap-2 cursor-pointer">
-              <Upload className="w-4 h-4" /> Import Local Backup
-              <input
-                type="file"
-                accept="application/json,.json"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void handleImport(file);
-                  e.currentTarget.value = '';
-                }}
-              />
-            </label>
 
             <button
               onClick={handleDeleteAccount}
