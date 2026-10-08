@@ -14,6 +14,15 @@ from app.models.domain_models import (
     ChatMessage,
     DailyPlan,
     EnvironmentResource,
+    JournalEntry,
+    Medication,
+    Appointment,
+    HealthRecord,
+    Goal,
+    Notification,
+    SleepRecord,
+    NutritionLog,
+    ExerciseRecord,
 )
 from app.schemas.domain_schemas import ChatRequest, ChatResponse
 from app.routers.auth import get_current_user
@@ -97,6 +106,35 @@ def chat_with_assistant(
         .first()
     )
 
+    # Full authenticated-user cloud snapshot. Every query is scoped to current_user.id.
+    journal_entries = db.query(JournalEntry).filter(
+        JournalEntry.user_id == current_user.id
+    ).order_by(JournalEntry.entry_date.desc(), JournalEntry.created_at.desc()).limit(20).all()
+    medications = db.query(Medication).filter(
+        Medication.user_id == current_user.id, Medication.is_active == True
+    ).order_by(Medication.reminder_time.asc()).all()
+    appointments = db.query(Appointment).filter(
+        Appointment.user_id == current_user.id
+    ).order_by(Appointment.date_time.asc()).limit(20).all()
+    health_records = db.query(HealthRecord).filter(
+        HealthRecord.user_id == current_user.id
+    ).order_by(HealthRecord.record_date.desc(), HealthRecord.created_at.desc()).limit(20).all()
+    goals = db.query(Goal).filter(
+        Goal.user_id == current_user.id
+    ).order_by(Goal.created_at.desc()).limit(20).all()
+    notifications = db.query(Notification).filter(
+        Notification.user_id == current_user.id
+    ).order_by(Notification.created_at.desc()).limit(20).all()
+    sleep_records = db.query(SleepRecord).filter(
+        SleepRecord.user_id == current_user.id
+    ).order_by(SleepRecord.sleep_date.desc()).limit(14).all()
+    nutrition_logs = db.query(NutritionLog).filter(
+        NutritionLog.user_id == current_user.id
+    ).order_by(NutritionLog.log_date.desc(), NutritionLog.created_at.desc()).limit(30).all()
+    exercise_records = db.query(ExerciseRecord).filter(
+        ExerciseRecord.user_id == current_user.id
+    ).order_by(ExerciseRecord.record_date.desc()).limit(20).all()
+
     profile_dict = {
         "user_name": profile.name if profile else None,
         "age": profile.age if profile else None,
@@ -140,6 +178,65 @@ def chat_with_assistant(
         **profile_dict,
         "weekly_workouts_count": len(workouts),
         "weekly_average_form_score": workout_average_form,
+        "workouts_last_7_days": [
+            {"id": w.id, "title": w.title, "target_muscle": w.target_muscle,
+             "duration_minutes": w.duration_minutes, "total_reps": w.total_reps,
+             "avg_form_score": w.avg_form_score, "calories_burned": w.calories_burned,
+             "created_at": w.created_at.isoformat() if w.created_at else None}
+            for w in workouts
+        ],
+        "exercise_records": [
+            {"exercise_name": r.exercise_name, "max_weight_kg": r.max_weight_kg,
+             "max_reps": r.max_reps, "best_form_score": r.best_form_score,
+             "record_date": str(r.record_date)}
+            for r in exercise_records
+        ],
+        "journal_entries": [
+            {"date": str(e.entry_date), "mood": e.mood, "content": e.content,
+             "tags": e.tags_json, "ai_summary": e.ai_summary}
+            for e in journal_entries
+        ],
+        "medications": [
+            {"id": m.id, "name": m.name, "dosage": m.dosage, "frequency": m.frequency,
+             "reminder_time": m.reminder_time, "notes": m.notes, "is_active": m.is_active}
+            for m in medications
+        ],
+        "appointments": [
+            {"id": a.id, "title": a.title, "category": a.category,
+             "date_time": a.date_time.isoformat() if a.date_time else None,
+             "location": a.location, "notes": a.notes, "reminder_enabled": a.reminder_enabled}
+            for a in appointments
+        ],
+        "health_records": [
+            {"id": h.id, "date": str(h.record_date), "title": h.title, "category": h.category,
+             "source_type": h.source_type, "metrics": h.metrics_json, "notes": h.notes}
+            for h in health_records
+        ],
+        "goals": [
+            {"id": g.id, "title": g.title, "category": g.category,
+             "target_value": g.target_value, "current_value": g.current_value,
+             "unit": g.unit, "deadline": str(g.deadline) if g.deadline else None,
+             "is_completed": g.is_completed}
+            for g in goals
+        ],
+        "notifications": [
+            {"id": n.id, "title": n.title, "message": n.message, "category": n.category,
+             "is_read": n.is_read,
+             "scheduled_for": n.scheduled_for.isoformat() if n.scheduled_for else None}
+            for n in notifications
+        ],
+        "sleep_records": [
+            {"date": str(s.sleep_date), "sleep_time": s.sleep_time, "wake_time": s.wake_time,
+             "duration_hours": s.duration_hours, "quality_score": s.quality_score,
+             "interruptions": s.interruptions, "notes": s.notes}
+            for s in sleep_records
+        ],
+        "nutrition_logs": [
+            {"date": str(n.log_date), "meal_type": n.meal_type, "food_name": n.food_name,
+             "portion": n.portion, "calories": n.calories, "protein_g": n.protein_g,
+             "carbs_g": n.carbs_g, "fat_g": n.fat_g}
+            for n in nutrition_logs
+        ],
         "today_schedule": today_schedule or [],
         "schedule": schedule_dict,
         "environment": {
