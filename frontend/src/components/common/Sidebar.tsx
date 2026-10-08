@@ -39,13 +39,11 @@ export const Sidebar: React.FC = () => {
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                  isActive
-                    ? 'bg-gradient-to-r from-sky-500/20 to-emerald-500/10 text-sky-400 border border-sky-500/30'
-                    : item.highlight
-                    ? 'text-emerald-400 hover:bg-slate-800/80 bg-emerald-950/20 border border-emerald-500/20'
-                    : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
-                }`}
+                isActive
+                  ? 'flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all bg-gradient-to-r from-sky-500/20 to-emerald-500/10 text-sky-400 border border-sky-500/30'
+                  : item.highlight
+                  ? 'flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all text-emerald-400 hover:bg-slate-800/80 bg-emerald-950/20 border border-emerald-500/20'
+                  : 'flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
               }
             >
               <Icon className="w-4 h-4" />
