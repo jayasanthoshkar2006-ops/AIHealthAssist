@@ -18,6 +18,7 @@ import { AssistantPage } from './pages/AssistantPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { PrivacyPage } from './pages/PrivacyPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { NotificationScheduler } from './components/common/NotificationScheduler';
 
 const ProtectedLayout: React.FC = () => {
@@ -151,6 +152,7 @@ export const App: React.FC = () => {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/onboarding" element={<OnboardingPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/*" element={<ProtectedLayout />} />
         </Routes>
       </HashRouter>
