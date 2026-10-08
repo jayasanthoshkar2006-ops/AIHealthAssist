@@ -117,6 +117,15 @@ class LocalHeuristicProvider(BaseAIProvider):
             elif meridiem == "am" and hour == 12: hour = 0
             return f"{hour:02d}:{minute:02d}"
 
+        def format_time(value: str) -> str:
+            try:
+                hour, minute = [int(x) for x in value.split(":")[:2]]
+                suffix = "AM" if hour < 12 else "PM"
+                display_hour = hour % 12 or 12
+                return f"{display_hour}:{minute:02d} {suffix}"
+            except Exception:
+                return value
+
         def infer_category(activity: str) -> str:
             x = activity.lower()
             if any(k in x for k in ["workout","exercise","gym","run","walk","yoga","training"]): return "workout"
@@ -463,16 +472,30 @@ class LocalHeuristicProvider(BaseAIProvider):
             action_performed = {"operation": "add" if is_schedule_add else "delete"}
 
         elif is_move_workout:
-            new_time = "19:00"
-            if any(x in msg_lower for x in ["6 pm", "6:00 pm", "18:00", "6 in the evening"]):
-                new_time = "18:00"
-            elif any(x in msg_lower for x in ["7 pm", "7:00 pm", "19:00", "7 in the evening"]):
+            time_match = __import__("re").search(r"(?:to|at|@)\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm))", msg, __import__("re").I)
+            if time_match:
+                raw_time = time_match.group(1).strip().lower().replace(" ", "")
+                meridiem = "pm" if "pm" in raw_time else "am"
+                clock = raw_time.replace("am", "").replace("pm", "")
+                parts = clock.split(":")
+                hour = int(parts[0])
+                minute = int(parts[1]) if len(parts) > 1 else 0
+                if meridiem == "pm" and hour < 12:
+                    hour += 12
+                elif meridiem == "am" and hour == 12:
+                    hour = 0
+                new_time = f"{hour:02d}:{minute:02d}"
+            elif "evening" in msg_lower:
                 new_time = "19:00"
-            response = f"Done. I moved your workout to {_format_time(new_time)}."
+            elif "morning" in msg_lower:
+                new_time = "07:00"
+            else:
+                new_time = "19:00"
+            response = f"Done. I moved your workout to {format_time(new_time)}."
             if is_tamil:
-                response = f"சரி. உங்கள் workout {_format_time(new_time)}க்கு மாற்றப்பட்டுள்ளது."
+                response = f"சரி. உங்கள் workout {format_time(new_time)}க்கு மாற்றப்பட்டுள்ளது."
             tool_executed = "update_schedule"
-            action_performed = {"new_workout_time": new_time}
+            action_performed = {"operation": "change", "new_workout_time": new_time}
 
         elif is_current_guideline:
             if use_internet:
