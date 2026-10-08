@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import { apiRequest } from '../api/client';
 import { DisclaimerBanner } from '../components/common/DisclaimerBanner';
 
@@ -42,7 +41,6 @@ export const DashboardPage: React.FC = () => {
   const [data, setData] = useState<any>(null);
   const [timeGreeting, setTimeGreeting] = useState(getTimeGreeting);
   const [loading, setLoading] = useState(true);
-  const { t } = useTranslation();
 
   const isDemo = data?.is_demo === true;
 
@@ -253,7 +251,7 @@ export const DashboardPage: React.FC = () => {
           </h2>
 
           <p className="text-xs text-slate-400 mt-1">
-            {t('welcomeBack')}
+            Welcome back
           </p>
 
         </div>
