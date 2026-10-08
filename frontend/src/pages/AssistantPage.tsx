@@ -12,7 +12,6 @@ export const AssistantPage: React.FC = () => {
     }
   ]);
   const [input, setInput] = useState('');
-  const [language, setLanguage] = useState('en');
   const [loading, setLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
 
@@ -35,7 +34,7 @@ export const AssistantPage: React.FC = () => {
 
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
-    recognition.lang = language === 'ta' ? 'ta-IN' : 'en-US';
+    recognition.lang = 'en-US';
     recognition.interimResults = false;
 
     recognition.onstart = () => setIsListening(true);
@@ -61,7 +60,7 @@ export const AssistantPage: React.FC = () => {
     try {
       const res: any = await apiRequest('/assistant/chat', {
         method: 'POST',
-        body: JSON.stringify({ message: currentInput, use_internet: true, language })
+        body: JSON.stringify({ message: currentInput, use_internet: true })
       });
 
       setMessages((prev) => [
@@ -87,10 +86,9 @@ export const AssistantPage: React.FC = () => {
 
   const promptChips = [
     { label: "What is my schedule today?", lang: "en" },
-    { label: "இன்றைக்கு என்னுடைய schedule என்ன?", lang: "ta" },
     { label: "How many workouts did I complete this week?", lang: "en" },
     { label: "Move my workout to evening.", lang: "en" },
-    { label: "What is the latest official WHO nutrition guideline?", lang: "en" }
+    { label: "What is the latest official WHO nutrition guideline?" }
   ];
 
   return (
@@ -110,13 +108,7 @@ export const AssistantPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Language Toggle */}
-          <button
-            onClick={() => setLanguage(language === 'en' ? 'ta' : 'en')}
-            className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-emerald-400 font-semibold"
-          >
-            {language === 'en' ? 'EN' : 'TA'}
-          </button>
+
         </div>
       </div>
 
@@ -190,7 +182,7 @@ export const AssistantPage: React.FC = () => {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={language === 'ta' ? 'கேள்வி அல்லது கட்டளை தட்டச்சு செய்யுங்...' : 'Ask your AI assistant or command a schedule change...'}
+          placeholder="Ask your AI assistant or command a schedule change..."
           className="flex-1 px-4 py-3 rounded-2xl bg-slate-900 border border-slate-800 focus:border-sky-500 focus:outline-none text-xs text-slate-100"
         />
 
