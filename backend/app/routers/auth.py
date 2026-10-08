@@ -1,10 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models.domain_models import User, UserProfile, UserPreference
+from app.models import domain_models\nfrom app.models.domain_models import User, UserProfile, UserPreference
 from app.schemas.domain_schemas import UserRegister, UserLogin, TokenResponse, ChangePassword, SetPinCode, VerifyPinCode
 from app.auth.security import get_password_hash, verify_password, create_access_token, decode_token
 from fastapi.security import OAuth2PasswordBearer
+from datetime import datetime, timedelta
+import hashlib
+import secrets
+import smtplib
+from email.message import EmailMessage
+from app.config import settings
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
@@ -64,6 +70,88 @@ def login(data: UserLogin, db: Session = Depends(get_db)):
         email=user.email,
         has_profile=has_prof
     )
+
+def _send_password_reset_email(email: str, reset_url: str) -> None:
+    if not all([settings.SMTP_HOST, settings.SMTP_USERNAME, settings.SMTP_PASSWORD, settings.EMAIL_FROM]):
+        raise RuntimeError("Password reset email is not configured on the server")
+
+    message = EmailMessage()
+    message["Subject"] = "HealthAssist AI - Reset your password"
+    message["From"] = settings.EMAIL_FROM
+    message["To"] = email
+    message.set_content(
+        "We received a request to reset your HealthAssist AI password.\\n\\n"
+        f"Use this link to create a new password:\\n{reset_url}\\n\\n"
+        "This link expires in 60 minutes and can only be used once.\\n\\n"
+        "If you did not request this, you can safely ignore this email.\\n\\n"
+        "HealthAssist AI"
+    )
+    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as smtp:
+        smtp.starttls()
+        smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+        smtp.send_message(message)
+
+
+@router.post("/password-reset/request")
+def request_password_reset(data: UserLogin, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == data.email).first()
+    # Keep the public response generic to avoid revealing whether an email is registered.
+    if not user:
+        return {"message": "If an account exists for that email, a password reset link has been sent."}
+
+    raw_token = secrets.token_urlsafe(48)
+    token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+    reset = domain_models.PasswordResetToken(
+        user_id=user.id,
+        token_hash=token_hash,
+        expires_at=datetime.utcnow() + timedelta(minutes=60),
+    )
+    db.add(reset)
+    db.commit()
+
+    base = settings.FRONTEND_URL.rstrip("/")
+    reset_url = f"{base}/#/reset-password?token={raw_token}"
+    try:
+        _send_password_reset_email(user.email, reset_url)
+    except Exception as exc:
+        db.delete(reset)
+        db.commit()
+        raise HTTPException(status_code=503, detail="Password reset email service is not configured or unavailable.") from exc
+
+    return {"message": "If an account exists for that email, a password reset link has been sent."}
+
+
+@router.post("/password-reset/confirm")
+def confirm_password_reset(token: str, new_password: str, db: Session = Depends(get_db)):
+    if len(new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    reset = (
+        db.query(domain_models.PasswordResetToken)
+        .filter(
+            domain_models.PasswordResetToken.token_hash == token_hash,
+            domain_models.PasswordResetToken.used_at.is_(None),
+            domain_models.PasswordResetToken.expires_at > datetime.utcnow(),
+        )
+        .first()
+    )
+    if not reset:
+        raise HTTPException(status_code=400, detail="Reset link is invalid or expired")
+
+    user = db.query(User).filter(User.id == reset.user_id).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Reset link is invalid or expired")
+
+    user.hashed_password = get_password_hash(new_password)
+    reset.used_at = datetime.utcnow()
+    db.query(domain_models.PasswordResetToken).filter(
+        domain_models.PasswordResetToken.user_id == user.id,
+        domain_models.PasswordResetToken.used_at.is_(None),
+    ).update({"used_at": datetime.utcnow()}, synchronize_session=False)
+    db.commit()
+    return {"message": "Password reset successfully. You can now sign in with your new password."}
+
 
 @router.post("/change-password")
 def change_password(data: ChangePassword, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
