@@ -357,8 +357,14 @@ class LocalHeuristicProvider(BaseAIProvider):
             or "exercise" in last_assistant.lower()
         )
 
-        is_schedule_add = any(x in msg_lower for x in ["add schedule", "add a schedule", "add to my schedule", "schedule a ", "create a schedule"])
-        is_schedule_delete = any(x in msg_lower for x in ["delete from my schedule", "delete schedule", "remove from my schedule", "remove schedule", "cancel from my schedule"])
+        is_schedule_add = (
+            any(x in msg_lower for x in ["add schedule", "add a schedule", "add to my schedule", "schedule a ", "create a schedule"])
+            or ("add " in msg_lower and any(x in msg_lower for x in [" at ", " @ "]))
+        )
+        is_schedule_delete = (
+            any(x in msg_lower for x in ["delete from my schedule", "delete schedule", "remove from my schedule", "remove schedule", "cancel from my schedule"])
+            or any(x in msg_lower for x in ["delete workout", "remove workout", "cancel workout", "delete lunch", "remove lunch", "delete breakfast", "remove breakfast"])
+        )
         is_schedule_change = (any(x in msg_lower for x in ["move", "change", "reschedule", "shift", "alter"]) and any(x in msg_lower for x in ["schedule", "workout", "lunch", "breakfast", "dinner", "sleep", "study", "work", "it"])) or "மாற்று" in message
         is_move_workout = is_schedule_change or ("workout" in msg_lower and any(x in msg_lower for x in ["evening", "morning", "6 pm", "7 pm"]))
 
