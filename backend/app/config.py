@@ -9,6 +9,13 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./healthassist.db")
     
+    # Email security notifications
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USERNAME: str = os.getenv("SMTP_USERNAME", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    EMAIL_FROM: str = os.getenv("EMAIL_FROM", "")
+
     # Auth
     JWT_SECRET: str = os.getenv("JWT_SECRET", "super-secret-key-change-in-production-32bytes-min")
     ALGORITHM: str = "HS256"
