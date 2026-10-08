@@ -2,17 +2,34 @@ import React, { useState } from 'react';
 import { useAuth } from '../store/AuthContext';
 import { apiRequest } from '../api/client';
 import { DisclaimerBanner } from '../components/common/DisclaimerBanner';
-import { Settings, Lock, Download, Upload, Trash2 } from 'lucide-react';
+import { Settings, Lock, Download, Upload, Trash2, KeyRound, Mail } from 'lucide-react';
 import { clearLocalAccountData, exportLocalData, importLocalData, getLocalStorageEstimate } from '../storage/localDb';
 
 export const SettingsPage: React.FC = () => {
-  const { logout } = useAuth();
+  const { logout, userEmail } = useAuth();
   const [pin, setPin] = useState('');
   const [msg, setMsg] = useState('');
   const [localStorageInfo, setLocalStorageInfo] = useState('Local IndexedDB storage is active.');
   const [appLockEnabled, setAppLockEnabled] = useState(
     localStorage.getItem('appLockEnabled') === 'true'
   );
+
+
+  const handleForgotPassword = async () => {
+    if (!userEmail) {
+      alert('Your account email could not be found. Please sign in again.');
+      return;
+    }
+    try {
+      const result = await apiRequest<{ message: string }>('/auth/password-reset/request', {
+        method: 'POST',
+        body: JSON.stringify({ email: userEmail }),
+      });
+      setMsg(result.message || 'If your account exists, a password reset link has been sent to your email.');
+    } catch (err: any) {
+      alert(err.message || 'Unable to send the password reset email.');
+    }
+  };
 
   const handleSetPin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,7 +168,29 @@ export const SettingsPage: React.FC = () => {
           )}
         </div>
 
-        {/* Data Ownership & Account Controls */}
+
+        {/* Forgot Password */}
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
+          <h3 className="font-bold text-sm text-slate-100 flex items-center gap-2">
+            <KeyRound className="w-4 h-4 text-emerald-400" /> Forgot Password
+          </h3>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            Send a secure password reset link to your registered email address.
+          </p>
+          <div className="rounded-xl bg-slate-950 border border-slate-800 px-4 py-3">
+            <p className="text-[10px] text-slate-500">Reset email will be sent to</p>
+            <p className="text-xs font-semibold text-slate-200 mt-1 break-all">{userEmail || 'Your registered email'}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleForgotPassword()}
+            className="w-full py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold text-xs border border-emerald-500/30 flex items-center justify-center gap-2"
+          >
+            <Mail className="w-4 h-4" /> Send Password Reset Link
+          </button>
+        </div>
+
+        {/* Data Ownership & Account Controls */
         <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
           <h3 className="font-bold text-sm text-slate-100">Data Ownership & Privacy Export</h3>
 
