@@ -174,6 +174,10 @@ export const LiveWorkoutPage: React.FC = () => {
   const [videoProgress, setVideoProgress] = useState(0);
   const [videoResult, setVideoResult] = useState<{ reps: number; formScore: number; duration: number; exercise: string } | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadedVideoUrlRef = useRef<string | null>(null);
+  const [videoMode, setVideoMode] = useState(false);
+  const [videoFileName, setVideoFileName] = useState('');
+  const [videoDuration, setVideoDuration] = useState(0);
 
   const exercise = EXERCISES.find(e => e.name === selectedExercise) || EXERCISES[0];
   const planExercises = suggested.length ? suggested : [exercise];
@@ -265,9 +269,14 @@ export const LiveWorkoutPage: React.FC = () => {
       rafRef.current = requestAnimationFrame(processFrame);
       return;
     }
-    const timestamp = performance.now();
+    const timestamp = videoMode ? Math.max(0, video.currentTime * 1000) : performance.now();
     // Run pose inference around 10 FPS. The old 1 FPS loop was too slow for accurate tracking and rep transitions.
-    if (timestamp - lastInferenceRef.current >= 100) {
+    if (videoMode && video.ended) {
+      setIsTraining(false);
+      setVideoMode(false);
+      return;
+    }
+    if (timestamp - lastInferenceRef.current >= 50) {
       lastInferenceRef.current = timestamp;
       lastFrameRef.current = Math.floor(timestamp / 1000);
       const result = poseRef.current.detectForVideo(video, timestamp);
@@ -317,7 +326,7 @@ export const LiveWorkoutPage: React.FC = () => {
       }
     }
     rafRef.current = requestAnimationFrame(processFrame);
-  }, [drawPose, exercise, isTraining, selectedExercise, speakFeedback]);
+  }, [drawPose, exercise, isTraining, selectedExercise, speakFeedback, videoMode, targetReps, planExercises, profile]);
 
   const startCamera = async () => {
     setCameraError('');
@@ -373,9 +382,15 @@ export const LiveWorkoutPage: React.FC = () => {
   }, [releaseCamera]);
 
   const stopCamera = async () => {
+    const wasVideo = videoMode;
+    const completedReps = repRef.current;
     releaseCamera();
     setIsTraining(false);
-    if (repRef.current === 0) {
+    setVideoMode(false);
+    if (wasVideo) {
+      setFeedback(`Video tracking complete. ${completedReps} valid ${selectedExercise} repetitions tracked.`);
+    }
+    if (completedReps === 0) {
       speakFeedback('Session ended. No completed repetitions were detected.');
       return;
     }
@@ -386,13 +401,13 @@ export const LiveWorkoutPage: React.FC = () => {
           title: `Live AI ${selectedExercise} Session`,
           target_muscle: exercise.muscles,
           duration_minutes: Math.max(1, Math.round(sessionSeconds / 60)),
-          total_reps: repRef.current,
+          total_reps: completedReps,
           avg_form_score: formScore,
           sessions: [{
             exercise_name: selectedExercise,
             sets_completed: 1,
             target_reps: targetReps,
-            actual_reps: repRef.current,
+            actual_reps: completedReps,
             form_accuracy: formScore,
             feedback_notes: feedback
           }]
@@ -414,104 +429,63 @@ export const LiveWorkoutPage: React.FC = () => {
     lastSpokenRef.current = '';
   };
 
-  const analyzeUploadedVideo = useCallback(async (file: File) => {
+  const trackUploadedVideo = useCallback(async (file: File) => {
     if (!file.type.startsWith('video/')) {
       setCameraError('Please select a video file.');
       return;
     }
-    if (!poseRef.current || !modelReady) {
-      await loadPoseModel();
-    }
-    if (!poseRef.current) {
-      setCameraError('AI pose model is not ready. Please try again.');
+    if (!poseRef.current || !modelReady) await loadPoseModel();
+    if (!poseRef.current || !videoRef.current) {
+      setCameraError('AI pose model or video player is not ready. Please try again.');
       return;
     }
 
-    setVideoAnalyzing(true);
-    setVideoProgress(0);
-    setVideoResult(null);
-    setCameraError('');
     try {
+      releaseCamera();
+      if (uploadedVideoUrlRef.current) URL.revokeObjectURL(uploadedVideoUrlRef.current);
       const url = URL.createObjectURL(file);
-      const video = document.createElement('video');
-      video.preload = 'auto';
+      uploadedVideoUrlRef.current = url;
+      const video = videoRef.current;
+      video.src = url;
+      video.srcObject = null;
       video.muted = true;
       video.playsInline = true;
-      video.src = url;
+      setVideoFileName(file.name);
+      setVideoMode(true);
+      setVideoResult(null);
+      setCameraError('');
+      setFeedback('Loading video. Pose tracking will start as soon as playback begins.');
+      repRef.current = 0;
+      stageRef.current = 'up';
+      lastInferenceRef.current = 0;
+      lastSpokenRef.current = '';
+      autoAdvanceRef.current = false;
+      setRepCount(0);
+      setFormScore(0);
+      setSessionSeconds(0);
 
       await new Promise<void>((resolve, reject) => {
-        video.onloadedmetadata = () => resolve();
-        video.onerror = () => reject(new Error('The selected video could not be loaded.'));
+        const onLoaded = () => {
+          setVideoDuration(Number.isFinite(video.duration) ? video.duration : 0);
+          resolve();
+        };
+        const onError = () => reject(new Error('The selected video could not be loaded.'));
+        video.addEventListener('loadedmetadata', onLoaded, { once: true });
+        video.addEventListener('error', onError, { once: true });
+        video.load();
       });
 
-      const duration = Number.isFinite(video.duration) ? video.duration : 0;
-      if (!duration) throw new Error('The selected video has no readable duration.');
-
-      let stage = 'up';
-      let reps = 0;
-      let validFrames = 0;
-      let formTotal = 0;
-      let lastTimestamp = -1;
-      const sampleEvery = 0.10;
-
-      const processAt = async (time: number) => {
-        video.currentTime = Math.min(time, duration);
-        await new Promise<void>(resolve => {
-          const done = () => resolve();
-          video.addEventListener('seeked', done, { once: true });
-        });
-
-        const timestamp = Math.max(0, time * 1000);
-        if (timestamp <= lastTimestamp) return;
-        lastTimestamp = timestamp;
-
-        const result = poseRef.current!.detectForVideo(video, timestamp);
-        const points = result.landmarks?.[0];
-        if (!points) return;
-
-        const measurement = exerciseMeasurement(selectedExercise, points);
-        const form = formFeedback(selectedExercise, points, measurement);
-        const visibility = avgVisibility(points, [11, 12, 23, 24, 25, 26, 27, 28]);
-
-        if (visibility >= 0.65 && form.score >= 65) {
-          validFrames += 1;
-          formTotal += form.score;
-          const nextStage = exerciseState(selectedExercise, measurement, stage);
-          if (nextStage === 'down' && stage === 'up') {
-            stage = 'down';
-          } else if (nextStage === 'up' && stage === 'down') {
-            stage = 'up';
-            reps += 1;
-          }
-        }
-      };
-
-      for (let time = 0; time <= duration; time += sampleEvery) {
-        await processAt(time);
-        setVideoProgress(Math.min(100, Math.round((time / duration) * 100)));
-      }
-
-      const avgForm = validFrames ? Math.round(formTotal / validFrames) : 0;
-      setVideoResult({
-        reps,
-        formScore: avgForm,
-        duration: Math.round(duration),
-        exercise: selectedExercise,
-      });
-      setFeedback(
-        reps > 0
-          ? 'Video analysis complete: ' + reps + ' valid ' + selectedExercise + ' repetitions detected.'
-          : 'Video analysis complete: no valid ' + selectedExercise + ' repetitions detected.'
-      );
-      URL.revokeObjectURL(url);
+      await video.play();
+      setIsTraining(true);
+      speakFeedback('Video pose tracking started. ' + targetReps + ' reps target.');
     } catch (err) {
       console.error(err);
-      setCameraError(err instanceof Error ? err.message : 'Video analysis failed. Try another video.');
-    } finally {
-      setVideoAnalyzing(false);
-      setVideoProgress(100);
+      setIsTraining(false);
+      setVideoMode(false);
+      setCameraError(err instanceof Error ? err.message : 'Video could not be started.');
     }
-  }, [loadPoseModel, modelReady, selectedExercise]);
+  }, [loadPoseModel, modelReady, releaseCamera, speakFeedback, targetReps]);
+
 
   const minutes = Math.floor(sessionSeconds / 60);
   const seconds = sessionSeconds % 60;
@@ -564,11 +538,12 @@ export const LiveWorkoutPage: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h3 className="font-bold text-sm text-slate-100 flex items-center gap-2">
-              <Film className="w-4 h-4 text-violet-400" /> Upload Video Exercise Counter
+              <Film className="w-4 h-4 text-violet-400" /> Video Pose Tracking
             </h3>
             <p className="text-xs text-slate-400 mt-1">
-              Upload a workout video and MediaPipe will analyze the selected exercise locally in your browser.
+              Upload a video and watch the same AI skeleton, rep counter and form feedback track your movement while the video plays.
             </p>
+            {videoFileName && <p className="text-[10px] text-slate-500 mt-2 truncate max-w-md">{videoFileName}</p>}
           </div>
           <input
             ref={videoInputRef}
@@ -577,46 +552,43 @@ export const LiveWorkoutPage: React.FC = () => {
             className="hidden"
             onChange={e => {
               const file = e.target.files?.[0];
-              if (file) void analyzeUploadedVideo(file);
+              if (file) void trackUploadedVideo(file);
               e.currentTarget.value = '';
             }}
           />
           <button
             onClick={() => videoInputRef.current?.click()}
-            disabled={videoAnalyzing || modelLoading}
+            disabled={isTraining || modelLoading}
             className="px-5 py-2.5 rounded-xl bg-violet-500 hover:bg-violet-400 text-white text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            <Upload className="w-4 h-4" />
-            {videoAnalyzing ? 'Analyzing ' + videoProgress + '%' : 'Upload Video & Count'}
+            <Upload className="w-4 h-4" /> Upload & Track Video
           </button>
         </div>
-        {videoAnalyzing && (
-          <div className="mt-4 h-2 rounded-full bg-slate-800 overflow-hidden">
-            <div className="h-full bg-violet-400 transition-all" style={{ width: videoProgress + '%' }} />
+        {videoMode && isTraining && (
+          <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="p-3 rounded-xl bg-slate-950 border border-violet-500/30 text-center">
+              <p className="text-[10px] text-slate-500">Video Time</p>
+              <strong className="block text-violet-400 mt-1 text-sm">{Math.floor((videoRef.current?.currentTime || 0) / 60)}:{String(Math.floor(videoRef.current?.currentTime || 0) % 60).padStart(2, '0')} / {Math.floor(videoDuration / 60)}:{String(Math.floor(videoDuration % 60)).padStart(2, '0')}</strong>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-950 border border-sky-500/30 text-center">
+              <p className="text-[10px] text-slate-500">Tracked Reps</p>
+              <strong className="block text-sky-400 mt-1 text-xl">{repCount}</strong>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-950 border border-emerald-500/30 text-center">
+              <p className="text-[10px] text-slate-500">Live Form</p>
+              <strong className="block text-emerald-400 mt-1 text-xl">{formScore ? formScore + '%' : '—'}</strong>
+            </div>
+            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-center">
+              <p className="text-[10px] text-slate-500">Tracking</p>
+              <strong className="block text-slate-200 mt-1 text-xs">LIVE • 20 FPS</strong>
+            </div>
           </div>
         )}
-        {videoResult && !videoAnalyzing && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-center">
-              <p className="text-[10px] text-slate-500">Exercise</p>
-              <strong className="block text-slate-200 mt-1 text-xs">{videoResult.exercise}</strong>
-            </div>
-            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-center">
-              <p className="text-[10px] text-slate-500">Valid Reps</p>
-              <strong className="block text-sky-400 mt-1 text-xl">{videoResult.reps}</strong>
-            </div>
-            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-center">
-              <p className="text-[10px] text-slate-500">Avg Form</p>
-              <strong className="block text-emerald-400 mt-1 text-xl">{videoResult.formScore ? videoResult.formScore + '%' : '—'}</strong>
-            </div>
-            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-center">
-              <p className="text-[10px] text-slate-500">Video</p>
-              <strong className="block text-slate-200 mt-1 text-xs">{videoResult.duration}s</strong>
-            </div>
-          </div>
+        {videoMode && !isTraining && videoDuration > 0 && (
+          <p className="mt-3 text-xs text-emerald-400">Video tracking finished. {repCount} valid repetitions were tracked.</p>
         )}
         <p className="text-[10px] text-slate-500 mt-3">
-          Privacy: the uploaded video is processed in this browser and is not uploaded to the HealthAssist server.
+          Privacy: the video is processed locally in your browser and is not uploaded to the HealthAssist server.
         </p>
       </div>
 
@@ -624,7 +596,7 @@ export const LiveWorkoutPage: React.FC = () => {
         <div className="lg:col-span-2 relative bg-slate-950 border border-slate-800 rounded-3xl overflow-hidden aspect-video flex items-center justify-center">
           <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
           <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
-          {!isTraining && (
+          {!isTraining && !videoMode && (
             <div className="absolute inset-0 bg-slate-950/85 flex flex-col items-center justify-center p-6 text-center space-y-3">
               <Video className="w-12 h-12 text-sky-400 stroke-1" />
               <p className="font-semibold text-sm text-slate-200">Camera View Standby</p>
@@ -638,7 +610,7 @@ export const LiveWorkoutPage: React.FC = () => {
           )}
           {isTraining && (
             <div className="absolute top-4 left-4 bg-slate-900/80 backdrop-blur border border-slate-700 px-3 py-1.5 rounded-xl text-xs text-slate-200 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> REAL AI • {selectedExercise.toUpperCase()}
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> {videoMode ? 'VIDEO AI TRACKING' : 'REAL AI'} • {selectedExercise.toUpperCase()}
             </div>
           )}
         </div>
