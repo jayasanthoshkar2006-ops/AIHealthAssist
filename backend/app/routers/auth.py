@@ -9,10 +9,12 @@ from fastapi.security import OAuth2PasswordBearer
 from datetime import datetime, timedelta
 import hashlib
 import secrets
-import smtplib
 import logging
 from email.message import EmailMessage
+import base64
 from app.config import settings
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 logger = logging.getLogger(__name__)
@@ -68,13 +70,21 @@ def _send_account_created_notification_safely(email: str) -> None:
 
 
 def _send_email(message: EmailMessage) -> None:
-    """Send mail through the single server-side sender configured on Render."""
-    if not all([settings.SMTP_HOST, settings.SMTP_USERNAME, settings.SMTP_PASSWORD, settings.EMAIL_FROM]):
-        raise RuntimeError("Server email sender is not configured")
-    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as smtp:
-        smtp.starttls()
-        smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
-        smtp.send_message(message)
+    """Send mail through the app-owned Gmail account using the Gmail API."""
+    if not all([settings.GMAIL_CLIENT_ID, settings.GMAIL_CLIENT_SECRET, settings.GMAIL_REFRESH_TOKEN, settings.EMAIL_FROM]):
+        raise RuntimeError("Gmail API sender is not configured")
+
+    creds = Credentials(
+        token=None,
+        refresh_token=settings.GMAIL_REFRESH_TOKEN,
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=settings.GMAIL_CLIENT_ID,
+        client_secret=settings.GMAIL_CLIENT_SECRET,
+        scopes=["https://www.googleapis.com/auth/gmail.send"],
+    )
+    service = build("gmail", "v1", credentials=creds, cache_discovery=False)
+    raw = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
+    service.users().messages().send(userId="me", body={"raw": raw}).execute()
 
 
 def _send_account_created_notification_email(email: str) -> None:
@@ -101,8 +111,8 @@ def _send_login_notification_safely(email: str) -> None:
 
 
 def _send_login_notification_email(email: str) -> None:
-    if not all([settings.SMTP_HOST, settings.SMTP_USERNAME, settings.SMTP_PASSWORD, settings.EMAIL_FROM]):
-        raise RuntimeError("Login notification email is not configured on the server")
+    if not all([settings.GMAIL_CLIENT_ID, settings.GMAIL_CLIENT_SECRET, settings.GMAIL_REFRESH_TOKEN, settings.EMAIL_FROM]):
+        raise RuntimeError("Gmail API sender is not configured")
 
     message = EmailMessage()
     message["Subject"] = "HealthAssist AI - New login detected"
@@ -137,8 +147,8 @@ def login(data: UserLogin, background_tasks: BackgroundTasks, db: Session = Depe
     )
 
 def _send_password_reset_email(email: str, reset_url: str) -> None:
-    if not all([settings.SMTP_HOST, settings.SMTP_USERNAME, settings.SMTP_PASSWORD, settings.EMAIL_FROM]):
-        raise RuntimeError("Password reset email is not configured on the server")
+    if not all([settings.GMAIL_CLIENT_ID, settings.GMAIL_CLIENT_SECRET, settings.GMAIL_REFRESH_TOKEN, settings.EMAIL_FROM]):
+        raise RuntimeError("Gmail API sender is not configured")
 
     message = EmailMessage()
     message["Subject"] = "HealthAssist AI - Reset your password"
@@ -230,8 +240,8 @@ def _send_password_changed_notification_safely(email: str) -> None:
 
 
 def _send_password_changed_notification_email(email: str) -> None:
-    if not all([settings.SMTP_HOST, settings.SMTP_USERNAME, settings.SMTP_PASSWORD, settings.EMAIL_FROM]):
-        raise RuntimeError("Password change notification email is not configured on the server")
+    if not all([settings.GMAIL_CLIENT_ID, settings.GMAIL_CLIENT_SECRET, settings.GMAIL_REFRESH_TOKEN, settings.EMAIL_FROM]):
+        raise RuntimeError("Gmail API sender is not configured")
 
     message = EmailMessage()
     message["Subject"] = "HealthAssist AI - Password changed"
