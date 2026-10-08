@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Dict, Any, List
 import requests
 
@@ -8,7 +9,11 @@ from app.config import settings
 
 
 class GroqProvider(BaseAIProvider):
-    """GroqCloud reasoning provider with the existing local action brain as a safety layer."""
+    """GroqCloud conversational AI with deterministic cloud-data/schedule tools."""
+
+    WHO_PHYSICAL_ACTIVITY_URL = (
+        "https://www.who.int/news-room/fact-sheets/detail/physical-activity"
+    )
 
     def __init__(self, api_key: str):
         self.api_key = api_key
@@ -61,6 +66,60 @@ class GroqProvider(BaseAIProvider):
     def analyze_sleep_patterns(self, sleep_logs: List[Dict[str, Any]]) -> Dict[str, Any]:
         return self.fallback.analyze_sleep_patterns(sleep_logs)
 
+    def _is_schedule_tool(self, result: Dict[str, Any]) -> bool:
+        return result.get("tool_executed") == "update_schedule"
+
+    def _is_cloud_data_tool(self, result: Dict[str, Any]) -> bool:
+        return result.get("tool_executed") in {
+            "get_today_schedule",
+            "get_weekly_workouts",
+        }
+
+    def _is_current_info_request(self, message: str) -> bool:
+        low = message.lower()
+        return (
+            ("latest" in low or "current" in low or "official" in low)
+            and any(term in low for term in ["who", "guideline", "physical activity"])
+        )
+
+    def _verify_who_physical_activity(self, message: str) -> Dict[str, Any]:
+        """Fetch the current official WHO physical-activity page, then ask Groq to summarize it."""
+        page = requests.get(self.WHO_PHYSICAL_ACTIVITY_URL, timeout=20)
+        page.raise_for_status()
+
+        # Keep the fetched text bounded so the model request remains small.
+        text_content = re.sub(r"<[^>]+>", " ", page.text)
+        text_content = re.sub(r"\s+", " ", text_content).strip()
+        source_excerpt = text_content[:12000]
+
+        system = """You are HealthAssist AI.
+Summarize the supplied official WHO physical-activity source accurately.
+Answer the user's question directly. Do not invent facts or medical advice.
+Mention that the information is from WHO and keep the answer concise."""
+        prompt = (
+            f"OFFICIAL WHO SOURCE URL: {self.WHO_PHYSICAL_ACTIVITY_URL}\n"
+            f"WHO PAGE CONTENT:\n{source_excerpt}\n\n"
+            f"USER QUESTION:\n{message}"
+        )
+        answer = self._chat(
+            [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+            temperature=0.2,
+        )
+        return {
+            "response": answer,
+            "source_type": "INTERNET_VERIFIED",
+            "tool_executed": "internet_verify",
+            "action_performed": None,
+            "citations": [{
+                "source": "World Health Organization — Physical activity",
+                "url": self.WHO_PHYSICAL_ACTIVITY_URL,
+            }],
+            "disclaimer": (
+                "This tool provides lifestyle and fitness wellness organization. "
+                "It is not a substitute for professional medical advice."
+            ),
+        }
+
     def chat_response(
         self,
         message: str,
@@ -68,12 +127,35 @@ class GroqProvider(BaseAIProvider):
         use_internet: bool = True,
         language: str = "en",
     ) -> Dict[str, Any]:
-        # Keep deterministic application actions ahead of the LLM.
+        # Run the deterministic brain only to identify real application tools.
         local_result = self.fallback.chat_response(
-            message, context, use_internet=True, language="en"
+            message, context, use_internet=False, language="en"
         )
-        if local_result.get("tool_executed"):
-            return local_result
+
+        # Database-changing commands must stay deterministic and go through the
+        # application's authenticated PostgreSQL persistence layer.
+        if self._is_schedule_tool(local_result):
+            return {
+                **local_result,
+                "source_type": "CLOUD_DATA",
+            }
+
+        # Direct questions about saved user data are answered from the
+        # authenticated PostgreSQL context, not from browser/local storage.
+        if self._is_cloud_data_tool(local_result):
+            return {
+                **local_result,
+                "source_type": "CLOUD_DATA",
+            }
+
+        # Current/official information is only labelled verified after a real
+        # request to the official WHO page.
+        if use_internet and self._is_current_info_request(message):
+            try:
+                return self._verify_who_physical_activity(message)
+            except Exception:
+                # Do not falsely claim that the answer was internet-verified.
+                pass
 
         safe_context = {
             "profile": {
@@ -103,13 +185,13 @@ class GroqProvider(BaseAIProvider):
         }
 
         system = """You are HealthAssist AI, a personal wellness and lifestyle assistant.
-Answer in English only. Use the supplied authenticated user's context to personalize
+Answer in English only. Use the supplied authenticated user's cloud data to personalize
 answers. Never invent user data. Do not diagnose diseases or prescribe medication.
 For medical concerns, recommend appropriate professional care. Be concise, practical,
 friendly, and answer the user's actual question. The application, not the model,
 performs schedule/database actions."""
         prompt = (
-            f"USER CONTEXT:\n{json.dumps(safe_context, ensure_ascii=False)}\n\n"
+            f"AUTHENTICATED USER CLOUD CONTEXT:\n{json.dumps(safe_context, ensure_ascii=False)}\n\n"
             f"USER MESSAGE:\n{message}"
         )
 
@@ -123,7 +205,18 @@ performs schedule/database actions."""
                 "tool_executed": None,
                 "action_performed": None,
                 "citations": None,
-                "disclaimer": "This tool provides lifestyle and fitness wellness organization. It is not a substitute for professional medical advice.",
+                "disclaimer": (
+                    "This tool provides lifestyle and fitness wellness organization. "
+                    "It is not a substitute for professional medical advice."
+                ),
             }
         except Exception:
-            return local_result
+            # If Groq is temporarily unavailable, do not mislabel the response
+            # as LOCAL_DATA. This is an explicit degraded mode.
+            return {
+                **local_result,
+                "source_type": "GROQ_AI_FALLBACK",
+                "tool_executed": None,
+                "action_performed": None,
+                "citations": None,
+            }
