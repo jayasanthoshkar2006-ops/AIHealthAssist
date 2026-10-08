@@ -120,12 +120,9 @@ and clearly say when the requested data is empty or unavailable. You may summari
 but do not diagnose or prescribe. Medication information is for reminders/organization only.
 The application, not the model, performs database-changing actions. Answer in English only."""
         prompt = (
-            f"AUTHENTICATED USER CLOUD DATA:
-{json.dumps(safe_context, ensure_ascii=False)}
-
-"
-            f"USER QUESTION:
-{message}"
+            "AUTHENTICATED USER CLOUD DATA:\n"
+            f"{json.dumps(safe_context, ensure_ascii=False)}\n\n"
+            f"USER QUESTION:\n{message}"
         )
         answer = self._chat(
             [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
@@ -148,7 +145,6 @@ The application, not the model, performs database-changing actions. Answer in En
         page = requests.get(self.WHO_PHYSICAL_ACTIVITY_URL, timeout=20)
         page.raise_for_status()
 
-        # Keep the fetched text bounded so the model request remains small.
         text_content = re.sub(r"<[^>]+>", " ", page.text)
         text_content = re.sub(r"\s+", " ", text_content).strip()
         source_excerpt = text_content[:12000]
@@ -188,40 +184,32 @@ Mention that the information is from WHO and keep the answer concise."""
         use_internet: bool = True,
         language: str = "en",
     ) -> Dict[str, Any]:
-        # Run the deterministic brain only to identify real application tools.
         local_result = self.fallback.chat_response(
             message, context, use_internet=False, language="en"
         )
 
-        # Database-changing commands must stay deterministic and go through the
-        # application's authenticated PostgreSQL persistence layer.
         if self._is_schedule_tool(local_result):
             return {
                 **local_result,
                 "source_type": "CLOUD_DATA",
             }
 
-        # Direct questions about saved user data are answered from the
-        # authenticated PostgreSQL context, not from browser/local storage.
         if self._is_cloud_data_tool(local_result):
             return {
                 **local_result,
                 "source_type": "CLOUD_DATA",
             }
 
-        if self._is_cloud_data_tool(local_result) or self._is_personal_data_request(message):
+        if self._is_personal_data_request(message):
             try:
                 return self._cloud_context_answer(message, context)
             except Exception:
                 pass
 
-        # Current/official information is only labelled verified after a real
-        # request to the official WHO page.
         if use_internet and self._is_current_info_request(message):
             try:
                 return self._verify_who_physical_activity(message)
             except Exception:
-                # Do not falsely claim that the answer was internet-verified.
                 pass
 
         safe_context = {
@@ -268,7 +256,8 @@ For medical concerns, recommend appropriate professional care. Be concise, pract
 friendly, and answer the user's actual question. The application, not the model,
 performs schedule/database actions."""
         prompt = (
-            f"AUTHENTICATED USER CLOUD CONTEXT:\n{json.dumps(safe_context, ensure_ascii=False)}\n\n"
+            "AUTHENTICATED USER CLOUD CONTEXT:\n"
+            f"{json.dumps(safe_context, ensure_ascii=False)}\n\n"
             f"USER MESSAGE:\n{message}"
         )
 
@@ -288,8 +277,6 @@ performs schedule/database actions."""
                 ),
             }
         except Exception:
-            # If Groq is temporarily unavailable, do not mislabel the response
-            # as LOCAL_DATA. This is an explicit degraded mode.
             return {
                 **local_result,
                 "source_type": "GROQ_AI_FALLBACK",
