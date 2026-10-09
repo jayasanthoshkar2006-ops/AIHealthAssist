@@ -22,7 +22,9 @@ class PDFReportGenerator:
     def _text(value: Any) -> str:
         if value is None or value == "":
             return "Not recorded"
-        if isinstance(value, (dict, list)):
+        if isinstance(value, list):
+            value = ", ".join(str(item) for item in value) if value else "None recorded"
+        elif isinstance(value, dict):
             value = json.dumps(value, ensure_ascii=False, default=str)
         elif isinstance(value, (date, datetime)):
             value = value.strftime("%Y-%m-%d %H:%M") if isinstance(value, datetime) else value.isoformat()
