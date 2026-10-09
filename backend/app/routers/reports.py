@@ -110,12 +110,28 @@ def generate_pdf_report(current_user: User = Depends(get_current_user), db: Sess
                     longest_streak=s.longest_streak, last_activity_date=s.last_activity_date) for s in streaks]
             + [_entry(f"Achievement — {a.title}", description=a.description, unlocked_at=a.unlocked_at) for a in achievements]
         ),
-        "plans": (
-            [_entry(f"Schedule — {s.schedule_date}", wake_time=s.wake_time, sleep_time=s.sleep_time,
-                    work_start=s.work_start, work_end=s.work_end, schedule=s.schedule_data) for s in schedules]
-            + [_entry(f"Daily plan — {p.plan_date}", timeline=p.timeline_json,
-                      recommendations=p.recommendations_json, ai_insights=p.ai_insights) for p in plans]
-        ),
+        "plans": {
+            "schedules": [
+                {
+                    "date": str(s.schedule_date) if s.schedule_date else "Not recorded",
+                    "wake_time": s.wake_time,
+                    "sleep_time": s.sleep_time,
+                    "work_start": s.work_start,
+                    "work_end": s.work_end,
+                    "timeline": s.schedule_data,
+                }
+                for s in schedules
+            ],
+            "daily_plans": [
+                {
+                    "date": str(p.plan_date) if p.plan_date else "Not recorded",
+                    "timeline": p.timeline_json,
+                    "recommendations": p.recommendations_json,
+                    "ai_insights": p.ai_insights,
+                }
+                for p in plans
+            ],
+        },
         "preferences": [("Food and activity preferences", {
             "profession": profile_data.get("profession", "Not recorded"),
             "food preference": profile_data.get("food_preference", "Not recorded"),
