@@ -132,22 +132,18 @@ def generate_pdf_report(current_user: User = Depends(get_current_user), db: Sess
                 for p in plans
             ],
         },
-        "preferences": [("Food and activity preferences", {
-            "profession": profile_data.get("profession", "Not recorded"),
-            "food preference": profile_data.get("food_preference", "Not recorded"),
-            "fitness level": profile_data.get("fitness_level", "Not recorded"),
-            "environment resources": {
-                "equipment": resources.equipment_list if resources else None,
-                "pantry foods": resources.pantry_foods if resources else None,
-                "cooking access": resources.cooking_access if resources else None,
-                "budget tier": resources.budget_tier if resources else None,
-            },
-            "app preferences": {
-                "language": preference.language if preference else None,
-                "theme": preference.theme if preference else None,
-                "voice feedback enabled": preference.voice_feedback_enabled if preference else None,
-            },
-        })],
+        "preferences": [
+            ("Profession", profile_data.get("profession")),
+            ("Food preference", profile_data.get("food_preference")),
+            ("Fitness level", profile_data.get("fitness_level")),
+            ("Available equipment", resources.equipment_list if resources else None),
+            ("Pantry foods", resources.pantry_foods if resources else None),
+            ("Cooking access", resources.cooking_access if resources else None),
+            ("Budget tier", resources.budget_tier if resources else None),
+            ("Language", preference.language if preference else None),
+            ("Theme", preference.theme if preference else None),
+            ("Voice feedback", ("Enabled" if preference.voice_feedback_enabled else "Disabled") if preference and preference.voice_feedback_enabled is not None else None),
+        ],
         "ai_observations": (
             f"This export includes {len(health_records)} health records, {len(workouts)} workouts, "
             f"{len(nutrition_logs)} nutrition logs, {len(sleep_records)} sleep logs, and "
