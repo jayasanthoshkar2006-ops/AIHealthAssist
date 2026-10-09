@@ -160,7 +160,7 @@ class PDFReportGenerator:
             "Cell": ParagraphStyle("HealthReportCell", parent=base["BodyText"], fontSize=8, leading=10,
                 textColor=colors.HexColor("#263746"), wordWrap="CJK"),
             "SmallCell": ParagraphStyle("HealthReportSmallCell", parent=base["BodyText"], fontSize=7.5, leading=9.5,
-                textColor=colors.HexColor("#263746"], wordWrap="CJK"),
+                textColor=colors.HexColor("#263746"), wordWrap="CJK"),
             "Disclaimer": ParagraphStyle("HealthReportDisclaimer", parent=base["Normal"], fontSize=8,
                 leading=11, textColor=colors.HexColor("#526579")),
         }
